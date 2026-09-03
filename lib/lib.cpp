@@ -1,5 +1,6 @@
-// fs/util.cpp
-#include "local.h"
+// lib/lib.cpp
+
+#include "lib.hpp"
 #include <iostream>
 #include <vector>
 #include <unistd.h>
@@ -7,6 +8,8 @@
 #include <grp.h>
 #include <sdbus-c++/sdbus-c++.h>
 #include <filesystem>
+
+namespace fbjqlib {
 
 bool get_uid_by_name(const char* user_name, uid_t* out_uid)
 {
@@ -78,7 +81,7 @@ std::unique_ptr<libconfig::Config> load_config(int argc, char** argv)
 	int opt;
 	const char* config_file = "/etc/fbjq.conf";
 
-	while ((opt = getopt(argc, argv, "c:")) != -1) {
+	while ((opt = ::getopt(argc, argv, "c:")) != -1) {
         switch (opt) {
             case 'c':
                 config_file = optarg;
@@ -110,7 +113,7 @@ std::unique_ptr<libconfig::Config> load_config(int argc, char** argv)
 		return nullptr;
 	}
 
-    auto checkdir = [&app_cfg](const char* key) -> bool {
+    auto fn_checkdir = [&app_cfg](const char* key) -> bool {
         if (! app_cfg->exists(key)) {
             std::cerr << "設定ファイルに '" << key << "' が見つかりません。" << std::endl;
             return false;
@@ -136,11 +139,11 @@ std::unique_ptr<libconfig::Config> load_config(int argc, char** argv)
         return true;
     };
 
-    if (! checkdir("mountpoint")) {
+    if (! fn_checkdir("mountpoint")) {
         return nullptr;
     }
 
-    if (! checkdir("spool_dir")) {
+    if (! fn_checkdir("spool_dir")) {
         return nullptr;
     }
 
@@ -231,4 +234,6 @@ bool systemd_unit_call_method(const std::string& unit_name, const std::string& m
                   << e.getMessage() << '\n';
         return false;
     }
+}
+
 }

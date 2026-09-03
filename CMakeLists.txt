@@ -16,5 +16,6 @@ find_package(PkgConfig REQUIRED)
 message(STATUS "CXX Flags (Debug): ${CMAKE_CXX_FLAGS_DEBUG}")
 message(STATUS "CXX Flags (Release): ${CMAKE_CXX_FLAGS_RELEASE}")
 
+add_subdirectory(lib)
 add_subdirectory(fs)
 add_subdirectory(executor)

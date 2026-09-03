@@ -1,5 +1,6 @@
 // fs/main.cpp
-#include "local.h"
+
+#include "local.hpp"
 #include <iostream>
 #include <vector>
 #include <filesystem>
@@ -63,7 +64,7 @@ struct SystemdUnitHelper
 			}
 
 			uid_t uid;
-			get_uid_by_name(q_item["exec_user"].c_str(), &uid);
+			fbjqlib::get_uid_by_name(q_item["exec_user"].c_str(), &uid);
 
 			// 
 			if (::chown(subdir.c_str(), uid, 0) != 0) {
@@ -76,11 +77,11 @@ struct SystemdUnitHelper
 				return false;
 			}
 
-			return systemd_unit_call_method(unit_name, "StartUnit");
+			return fbjqlib::systemd_unit_call_method(unit_name, "StartUnit");
 		};
 
 		// .path ユニットの起動
-		if (foreach_valid_queue_items(app_cfg, fn_start) <= 0) {
+		if (fbjqlib::foreach_valid_queue_items(app_cfg, fn_start) <= 0) {
 			std::cerr << "有効な queue アイテムが見つかりません。" << std::endl;
 			return;
 		}
@@ -96,11 +97,11 @@ struct SystemdUnitHelper
 			unit_name += q_item.getName();
 			unit_name += ".path";
 
-			return systemd_unit_call_method(unit_name, "StopUnit");
+			return fbjqlib::systemd_unit_call_method(unit_name, "StopUnit");
 		};
 
 		// .path ユニットの停止
-		foreach_valid_queue_items(app_cfg, fn_stop);
+		fbjqlib::foreach_valid_queue_items(app_cfg, fn_stop);
 	}
 };
 
@@ -111,7 +112,7 @@ int main(int argc, char** argv)
 	::umask(0);
 
 	// 設定ファイルの読み込み
-	auto _appConfig{ load_config(argc, argv) };
+	auto _appConfig{ fbjqlib::load_config(argc, argv) };
 	if (! _appConfig) {
 		return EXIT_FAILURE;
 	}
@@ -125,7 +126,7 @@ int main(int argc, char** argv)
 	const auto& args = _fuseArgs.args;
 
 	// FUSE コンテキストの作成
-	struct fbjq_context_type app_ctx {
+	struct fbjqlib::context_type app_ctx {
 		.cfg = app_cfg,
 		//.mountpoint = mountpoint,
 		.spool_dir = spool_dir,
