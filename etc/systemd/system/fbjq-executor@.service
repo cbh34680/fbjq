@@ -1,0 +1,9 @@
+# /etc/systemd/system/fbjq-executor@.service
+
+[Unit]
+Description=FBJQ Executor Worker for Queue /var/fbjq/queue/%I
+
+[Service]
+Type=oneshot
+ExecStart=/root/work/fbjq/build/debug/executor/fbjq-executor -q %I
+Slice=system.slice

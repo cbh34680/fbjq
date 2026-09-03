@@ -1,0 +1,38 @@
+
+root@guest:~# apt-file search libfuse
+
+root@guest:~# apt install libfuse3-dev
+
+root@guest:~/work/fbjq# pkg-config fuse3 --cflags --libs
+-I/usr/include/fuse3 -lfuse3 -lpthread
+
+root@guest:~/work/fbjq# pkg-config --modversion fuse3
+3.17.2
+
+root@guest:~/work/fbjq/memo# sed -i '/^#user_allow_other$/s/^#//' /etc/fuse.conf
+
+root@guest:~/work/fbjq# apt install libconfig++-dev
+
+root@guest:~/work/fbjq# apt install libsdbus-c++-dev
+
+root@guest:~/work/fbjq# cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+root@guest:~/work/fbjq# cmake --build build --verbose
+
+root@guest:~/work/fbjq# systemd-tmpfiles --create etc/tmpfiles.d/fbjq.conf
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

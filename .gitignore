@@ -1,0 +1,8 @@
+/.github/
+/build/
+/a/
+
+/*.sh
+/vsc.code-workspace
+
+*.swp
