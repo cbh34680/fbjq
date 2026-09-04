@@ -106,7 +106,7 @@ int main(int argc, char** argv)
 	namespace fs = std::filesystem;
 
 	int opt;
-	const char* cfg_file = fbjqlib::DEFAULT_cfg_file;
+	const char* cfg_file = fbjqlib::DEFAULT_CONFIG_FILE;
 	bool check_only = false;
 
 	while ((opt = ::getopt(argc, argv, "cf:")) != -1) {

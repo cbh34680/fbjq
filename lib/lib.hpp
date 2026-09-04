@@ -13,13 +13,15 @@
 
 namespace fbjqlib {
 
-inline constexpr const char* DEFAULT_cfg_file = "/etc/fbjq.conf";
+inline constexpr const char* DEFAULT_CONFIG_FILE = "/etc/fbjq.conf";
+inline constexpr int QUEUE_MAX_PROCESS = 32;
 
 struct queue_item {
 	const char* exec_user{ nullptr };
 	const char* allow_group{ nullptr };
 	uid_t exec_user_uid{ static_cast<uid_t>(-1) };
 	gid_t allow_group_gid{ static_cast<gid_t>(-1) };
+	int max_process{ 1 };
 };
 
 // util.cpp で定義される関数の宣言

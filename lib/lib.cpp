@@ -181,6 +181,15 @@ static bool get_queue_item_internal(const libconfig::Setting &q_item, queue_item
         return false;
     }
 
+    int max_process = 1;
+    q_item.lookupValue("max_process", max_process);
+
+    if (max_process <= 0) {
+        max_process = 1;
+    } else if (max_process > QUEUE_MAX_PROCESS) {
+        max_process = 32;
+    }
+
     uid_t exec_user_uid;
     if (! fbjqlib::get_uid_by_name(exec_user, &exec_user_uid)) {
         return false;
@@ -195,12 +204,13 @@ static bool get_queue_item_internal(const libconfig::Setting &q_item, queue_item
     out->allow_group = allow_group;
     out->exec_user_uid = exec_user_uid;
     out->allow_group_gid = allow_group_gid;
+    out->max_process = max_process;
 
     return true;
 }
 
-bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_item* out) {
-
+bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_item* out)
+{
     if (! app_cfg->exists("queue")) {
         return false;
     }
