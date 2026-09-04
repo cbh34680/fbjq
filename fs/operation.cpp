@@ -49,44 +49,33 @@ static int fbjq_getattr(const char* path, struct stat* stbuf, struct fuse_file_i
 		return 0;
 	}
 
-	auto app_cfg = APP_CTX()->cfg;
+	auto app_cfg = APP_CTX()->app_cfg;
 	if (! app_cfg->exists("queue")) {
 		return -ENOENT;
 	}
 
-	const auto& queue = app_cfg->lookup("queue");
-
-	auto path1 = path + 1; // 先頭の '/' をスキップ
-	//std::cout << path1 << std::endl;
-
-	if (queue.isGroup() && queue.exists(path1)) {
-		const auto& q_item = queue[path1];
-
-		if (fbjqlib::is_valid_queue_item(q_item)) {
-			uid_t uid;
-			fbjqlib::get_uid_by_name(q_item["exec_user"].c_str(), &uid);
-			gid_t gid;
-			fbjqlib::get_gid_by_name(q_item["allow_group"].c_str(), &gid);
-
-			stbuf->st_mode = S_IFIFO | 0620;
-			stbuf->st_nlink = 1;
-			stbuf->st_uid = uid;
-			stbuf->st_gid = gid;
-			stbuf->st_atime = APP_CTX()->boot_time;
-			stbuf->st_mtime = APP_CTX()->boot_time;
-			stbuf->st_ctime = APP_CTX()->boot_time;
-
-			return 0;
-		}
+	fbjqlib::queue_item q_item;
+	if (! fbjqlib::get_queue_item(app_cfg, path + 1, &q_item)) {
+		return -ENOENT;
 	}
 
-	return -ENOENT;
+	stbuf->st_mode = S_IFIFO | 0620;
+	stbuf->st_nlink = 1;
+	stbuf->st_uid = q_item.exec_user_uid;
+	stbuf->st_gid = q_item.allow_group_gid;
+	stbuf->st_atime = APP_CTX()->boot_time;
+	stbuf->st_mtime = APP_CTX()->boot_time;
+	stbuf->st_ctime = APP_CTX()->boot_time;
+
+	return 0;
 }
 
 static int fbjq_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offset,
 	struct fuse_file_info* fi, enum fuse_readdir_flags flags)
 {
-	(void) offset;
+	(void)offset;
+	(void)fi;
+	(void)flags;
 
 	if (std::strcmp(path, "/") != 0) {
 		return -ENOENT;
@@ -95,16 +84,20 @@ static int fbjq_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off
 	filler(buf, ".",  nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
 	filler(buf, "..", nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
 
-	auto fn = [buf, filler](const auto& q_item) -> bool {
-		filler(buf, q_item.getName(), nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
+	auto append_queue = [buf, filler](const char* q_name, const auto& q_item) -> bool {
+		(void)q_item;
+		
+		filler(buf, q_name, nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
 		return true;
 	};
 
-	fbjqlib::for_each_queue_item(APP_CTX()->cfg, fn);
+	fbjqlib::for_each_queue_item(APP_CTX()->app_cfg, append_queue);
 
 	return 0;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 static const struct fuse_operations fbjq_oper =
 {
 	.getattr	= fbjq_getattr,
@@ -113,6 +106,7 @@ static const struct fuse_operations fbjq_oper =
 //	.open		= fbjq_open,
 //	.read		= fbjq_read,
 };
+#pragma GCC diagnostic pop
 
 const struct fuse_operations* fbjq_operations()
 {

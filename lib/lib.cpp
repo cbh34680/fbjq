@@ -6,9 +6,7 @@
 #include <filesystem>
 #include <iostream>
 #include <alloca.h>
-#include <grp.h>
 #include <unistd.h>
-#include <pwd.h>
 #include <sdbus-c++/sdbus-c++.h>
 
 namespace fbjqlib {
@@ -85,20 +83,20 @@ static bool is_root_directory(const std::filesystem::path& path)
     return norm.parent_path() == norm;
 }
 
-std::unique_ptr<libconfig::Config> load_config(const char* config_file)
+std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
 {
     // 設定ファイルの読み込み
 	auto appConfigPtr{ std::make_unique<libconfig::Config>() };
     auto* app_cfg{ appConfigPtr.get() };
 
 	try {
-		app_cfg->readFile(config_file);
+		app_cfg->readFile(cfg_file);
 
 	} catch (const libconfig::FileIOException &fioex) {
-		std::cerr << "設定ファイルの読み込みエラー: " << config_file << std::endl;
+		std::cerr << "設定ファイルの読み込みエラー: " << cfg_file << std::endl;
 		return nullptr;
 	} catch (const libconfig::ParseException &pex) {
-		std::cerr << "設定ファイルの解析エラー: " << config_file
+		std::cerr << "設定ファイルの解析エラー: " << cfg_file
 				  << " 行: " << pex.getLine()
 				  << " エラー: " << pex.getError() << std::endl;
 		return nullptr;
@@ -110,7 +108,7 @@ std::unique_ptr<libconfig::Config> load_config(const char* config_file)
         return nullptr;
     }
 
-    auto fn_checkdir = [&app_cfg](const char* key) -> bool {
+    auto checkdir = [&app_cfg](const char* key) -> bool {
         if (! app_cfg->exists(key)) {
             std::cerr << "設定ファイルに '" << key << "' が見つかりません。" << std::endl;
             return false;
@@ -136,11 +134,11 @@ std::unique_ptr<libconfig::Config> load_config(const char* config_file)
         return true;
     };
 
-    if (! fn_checkdir("mountpoint")) {
+    if (! checkdir("mountpoint")) {
         return nullptr;
     }
 
-    if (! fn_checkdir("spool_dir")) {
+    if (! checkdir("spool_dir")) {
         return nullptr;
     }
 
@@ -156,7 +154,14 @@ std::unique_ptr<libconfig::Config> load_config(const char* config_file)
         }
     }
 
-    if (for_each_queue_item(app_cfg, [](const auto& q_item) { return true; }) <= 0) {
+    auto noop = [](const char* q_name, const auto& q_item) {
+        (void)q_name;
+        (void)q_item;
+        
+        return true;
+    };
+
+    if (for_each_queue_item(app_cfg, noop) <= 0) {
         std::cerr << "有効な queue アイテムが見つかりません。" << std::endl;
         return nullptr;
     }
@@ -164,49 +169,90 @@ std::unique_ptr<libconfig::Config> load_config(const char* config_file)
 	return appConfigPtr;
 }
 
-bool is_valid_queue_item(const libconfig::Setting& q_item)
+static bool get_queue_item_internal(const libconfig::Setting &q_item, queue_item* out)
 {
-	if (q_item.isGroup()
-		&& q_item.exists("exec_user") && q_item["exec_user"].isString()
-		&& q_item.exists("allow_group") && q_item["allow_group"].isString()
-	) {
-		if (get_uid_by_name(q_item["exec_user"].c_str(), nullptr) &&
-			get_gid_by_name(q_item["allow_group"].c_str(), nullptr)) {
+    const char* exec_user = nullptr;
+    if (! q_item.lookupValue("exec_user", exec_user)) {
+        return false;
+    }
 
-				return true;
-		}
-	}
+    const char* allow_group = nullptr;
+    if (! q_item.lookupValue("allow_group", allow_group)) {
+        return false;
+    }
 
-	return false;
+    uid_t exec_user_uid;
+    if (! fbjqlib::get_uid_by_name(exec_user, &exec_user_uid)) {
+        return false;
+    }
+
+    gid_t allow_group_gid;
+    if (! fbjqlib::get_gid_by_name(allow_group, &allow_group_gid)) {
+        return false;
+    }
+
+    out->exec_user= exec_user;
+    out->allow_group = allow_group;
+    out->exec_user_uid = exec_user_uid;
+    out->allow_group_gid = allow_group_gid;
+
+    return true;
 }
 
-int for_each_queue_item(const libconfig::Config* cfg, std::function<bool(const libconfig::Setting&)> fn)
+bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_item* out) {
+
+    if (! app_cfg->exists("queue")) {
+        return false;
+    }
+
+    const auto& queue = app_cfg->lookup("queue");
+    if (! queue.isGroup()) {
+        return false;
+    }
+
+    if (! queue.exists(q_name)) {
+        return false;
+    }
+
+     if (! get_queue_item_internal(queue[q_name], out)) {
+        return false;
+    }
+
+    return true;
+}
+
+int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(const char*, const queue_item&)> callback)
 {
-    int ret = -1;
+    int item_count = -1;
 
-	if (cfg->exists("queue")) {
-		const auto& queue = cfg->lookup("queue");
+	if (app_cfg->exists("queue")) {
+		const auto& queue = app_cfg->lookup("queue");
 
-        ret = 0; // 初期化
+        if (queue.isGroup()) {
+            item_count = 0; // 初期化
 
-		for (int i = 0; i < queue.getLength(); ++i) {
-			const auto& q_item = queue[i];
+            const int q_len = queue.getLength();
 
-			if (is_valid_queue_item(q_item)) {
-				if (! fn(q_item))
+            for (int i = 0; i < q_len; ++i) {
+                const char* q_name = queue[i].getName();
+
+                queue_item q_item;
+                if (! get_queue_item_internal(queue[i], &q_item)) {
+                    std::cerr << q_name << ": invalid name" << std::endl;
+                    continue;
+                }
+
+                if (! callback(q_name, q_item))
                 {
                     return -1; // コールバックが false を返した場合、処理を中断して -1 を返す
                 }
 
-                ret++; // 有効なアイテムが見つかった場合にカウントを増やす
-			}
-            else {
-                std::cerr << q_item.getName() << ": invalid name" << std::endl;
+                item_count++; // 有効なアイテムが見つかった場合にカウントを増やす
             }
-		}
+        }
 	}
 
-	return ret;
+	return item_count;
 }
 
 bool call_systemd_unit_method(const std::string& unit_name, const std::string& method)

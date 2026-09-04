@@ -39,18 +39,18 @@ struct SystemdUnitHelper
 	bool success = false;
 	const libconfig::Config* app_cfg;
 
-	SystemdUnitHelper(const libconfig::Config* app_cfg_arg, const std::filesystem::path& spool_dir)
-		: app_cfg{ app_cfg_arg }
+	SystemdUnitHelper(const libconfig::Config* app_cfg_, const std::filesystem::path& spool_dir)
+		: app_cfg{ app_cfg_ }
 	{
 		namespace fs = std::filesystem;
 
 		// .path ユニットの起動関数
-		auto start_unit = [&spool_dir](const auto& q_item) -> bool {
+		auto start_unit = [&spool_dir](const char* q_name, const auto& q_item) -> bool {
 			std::string unit_name{ "fbjq-executor@" };
-			unit_name += q_item.getName();
+			unit_name += q_name;
 			unit_name += ".path";
 
-			const auto subdir{ spool_dir / "queue" / q_item.getName() };
+			const auto subdir{ spool_dir / "queue" / q_name};
 
 			if (! fs::exists(subdir)) {
 				std::error_code ec;
@@ -62,11 +62,8 @@ struct SystemdUnitHelper
 				}
 			}
 
-			uid_t uid;
-			fbjqlib::get_uid_by_name(q_item["exec_user"].c_str(), &uid);
-
 			// 
-			if (::chown(subdir.c_str(), uid, 0) != 0) {
+			if (::chown(subdir.c_str(), q_item.exec_user_uid, 0) != 0) {
 				std::cerr << "error: chown" << std::endl;
 				return false;
 			}
@@ -89,9 +86,11 @@ struct SystemdUnitHelper
 	{
 		// .path ユニットの停止関数
 		//auto fn_stop = [](const libconfig::Setting& q_item) -> bool {
-		auto stop_unit = [](const auto& q_item) -> bool {
+		auto stop_unit = [](const char* q_name, const auto& q_item) -> bool {
+			(void)q_item;
+
 			std::string unit_name{ "fbjq-executor@" };
-			unit_name += q_item.getName();
+			unit_name += q_name;
 			unit_name += ".path";
 
 			return fbjqlib::call_systemd_unit_method(unit_name, "StopUnit");
@@ -107,7 +106,7 @@ int main(int argc, char** argv)
 	namespace fs = std::filesystem;
 
 	int opt;
-	const char* config_file = fbjqlib::DEFAULT_CONFIG_FILE;
+	const char* cfg_file = fbjqlib::DEFAULT_cfg_file;
 	bool check_only = false;
 
 	while ((opt = ::getopt(argc, argv, "cf:")) != -1) {
@@ -116,23 +115,23 @@ int main(int argc, char** argv)
 				check_only = true;
 				break;
             case 'f':
-                config_file = optarg;
+                cfg_file = optarg;
                 break;
 
             default:
                 // 不明なオプション、または引数が不足している場合
-                fprintf(stderr, "使用方法: %s [-f config_file]\n", argv[0]);
+                fprintf(stderr, "使用方法: %s [-f cfg_file]\n", argv[0]);
                 return EXIT_FAILURE;
         }
     }
 
     // optind をリセットして、後続のコードで再度 getopt を使用できるようにする
-	optind = 1;
+	optind = 0;
 
 	::umask(0);
 
 	// 設定ファイルの読み込み
-	auto appConfigPtr{ fbjqlib::load_config(config_file) };
+	auto appConfigPtr{ fbjqlib::load_config(cfg_file) };
 	if (appConfigPtr) {
 		if (check_only) {
 			std::cerr << "Config OK";
@@ -153,7 +152,7 @@ int main(int argc, char** argv)
 
 	// FUSE コンテキストの作成
 	struct fbjqlib::context_type app_ctx {
-		.cfg = app_cfg,
+		.app_cfg = app_cfg,
 		//.mountpoint = mountpoint,
 		.spool_dir = spool_dir,
 		.boot_time = ::time(nullptr),
