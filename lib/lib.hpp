@@ -18,8 +18,8 @@ bool get_uid_by_name(const char* user_name, uid_t* out_uid);
 bool get_gid_by_name(const char* group_name, gid_t* out_gid);
 std::unique_ptr<libconfig::Config> load_config(const char* config_file);
 bool is_valid_queue_item(const libconfig::Setting& q_item);
-int each_queue_items(const libconfig::Config* cfg, std::function<bool(const libconfig::Setting&)> fn);
-bool systemd_unit_call_method(const std::string& unit_name, const std::string& method);
+int for_each_queue_item(const libconfig::Config* cfg, std::function<bool(const libconfig::Setting&)> fn);
+bool call_systemd_unit_method(const std::string& unit_name, const std::string& method);
 
 // handler.cpp で定義される関数の宣言
 struct context_type {

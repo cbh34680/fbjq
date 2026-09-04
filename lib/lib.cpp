@@ -72,14 +72,14 @@ bool get_gid_by_name(const char* group_name, gid_t* out_gid)
     return false; // エラーまたはグループが存在しない場合
 }
 
-static bool is_root_directory(const std::filesystem::path& p)
+static bool is_root_directory(const std::filesystem::path& path)
 {
-    if (p.empty()) {
+    if (path.empty()) {
         return false;
     }
 
     // パスを正規化して末尾の冗長なスラッシュ等を揃える
-    std::filesystem::path norm = p.lexically_normal();
+    std::filesystem::path norm = path.lexically_normal();
 
     // 親ディレクトリが自分自身と等しい場合はルートディレクトリ
     return norm.parent_path() == norm;
@@ -88,8 +88,8 @@ static bool is_root_directory(const std::filesystem::path& p)
 std::unique_ptr<libconfig::Config> load_config(const char* config_file)
 {
     // 設定ファイルの読み込み
-	auto _appConfig{ std::make_unique<libconfig::Config>() };
-    auto* app_cfg{ _appConfig.get() };
+	auto appConfigPtr{ std::make_unique<libconfig::Config>() };
+    auto* app_cfg{ appConfigPtr.get() };
 
 	try {
 		app_cfg->readFile(config_file);
@@ -156,12 +156,12 @@ std::unique_ptr<libconfig::Config> load_config(const char* config_file)
         }
     }
 
-    if (each_queue_items(app_cfg, [](const auto& q_item) { return true; }) <= 0) {
+    if (for_each_queue_item(app_cfg, [](const auto& q_item) { return true; }) <= 0) {
         std::cerr << "有効な queue アイテムが見つかりません。" << std::endl;
         return nullptr;
     }
 
-	return _appConfig;
+	return appConfigPtr;
 }
 
 bool is_valid_queue_item(const libconfig::Setting& q_item)
@@ -180,7 +180,7 @@ bool is_valid_queue_item(const libconfig::Setting& q_item)
 	return false;
 }
 
-int each_queue_items(const libconfig::Config* cfg, std::function<bool(const libconfig::Setting&)> fn)
+int for_each_queue_item(const libconfig::Config* cfg, std::function<bool(const libconfig::Setting&)> fn)
 {
     int ret = -1;
 
@@ -209,7 +209,7 @@ int each_queue_items(const libconfig::Config* cfg, std::function<bool(const libc
 	return ret;
 }
 
-bool systemd_unit_call_method(const std::string& unit_name, const std::string& method)
+bool call_systemd_unit_method(const std::string& unit_name, const std::string& method)
 {
     try {
         auto proxy = sdbus::createProxy(

@@ -100,7 +100,7 @@ static int fbjq_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off
 		return true;
 	};
 
-	fbjqlib::each_queue_items(APP_CTX()->cfg, fn);
+	fbjqlib::for_each_queue_item(APP_CTX()->cfg, fn);
 
 	return 0;
 }

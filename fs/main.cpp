@@ -45,7 +45,7 @@ struct SystemdUnitHelper
 		namespace fs = std::filesystem;
 
 		// .path ユニットの起動関数
-		auto fn_start = [&spool_dir](const auto& q_item) -> bool {
+		auto start_unit = [&spool_dir](const auto& q_item) -> bool {
 			std::string unit_name{ "fbjq-executor@" };
 			unit_name += q_item.getName();
 			unit_name += ".path";
@@ -76,11 +76,11 @@ struct SystemdUnitHelper
 				return false;
 			}
 
-			return fbjqlib::systemd_unit_call_method(unit_name, "StartUnit");
+			return fbjqlib::call_systemd_unit_method(unit_name, "StartUnit");
 		};
 
 		// .path ユニットの起動
-		fbjqlib::each_queue_items(app_cfg, fn_start);
+		fbjqlib::for_each_queue_item(app_cfg, start_unit);
 
 		success = true;
 	}
@@ -89,16 +89,16 @@ struct SystemdUnitHelper
 	{
 		// .path ユニットの停止関数
 		//auto fn_stop = [](const libconfig::Setting& q_item) -> bool {
-		auto fn_stop = [](const auto& q_item) -> bool {
+		auto stop_unit = [](const auto& q_item) -> bool {
 			std::string unit_name{ "fbjq-executor@" };
 			unit_name += q_item.getName();
 			unit_name += ".path";
 
-			return fbjqlib::systemd_unit_call_method(unit_name, "StopUnit");
+			return fbjqlib::call_systemd_unit_method(unit_name, "StopUnit");
 		};
 
 		// .path ユニットの停止
-		fbjqlib::each_queue_items(app_cfg, fn_stop);
+		fbjqlib::for_each_queue_item(app_cfg, stop_unit);
 	}
 };
 
@@ -132,8 +132,8 @@ int main(int argc, char** argv)
 	::umask(0);
 
 	// 設定ファイルの読み込み
-	auto _appConfig{ fbjqlib::load_config(config_file) };
-	if (_appConfig) {
+	auto appConfigPtr{ fbjqlib::load_config(config_file) };
+	if (appConfigPtr) {
 		if (check_only) {
 			std::cerr << "Config OK";
 			return EXIT_SUCCESS;
@@ -143,13 +143,13 @@ int main(int argc, char** argv)
 		return EXIT_FAILURE;
 	}
 
-	const auto* app_cfg{ _appConfig.get() };
+	const auto* app_cfg{ appConfigPtr.get() };
 	fs::path mountpoint{ app_cfg->lookup("mountpoint").c_str() };
 	fs::path spool_dir{ app_cfg->lookup("spool_dir").c_str() };
 
 	// FUSE の引数を生成
-	FuseArgsHelper _fuseArgs{ argv[0], mountpoint };
-	const auto& args = _fuseArgs.args;
+	FuseArgsHelper fuseArgs{ argv[0], mountpoint };
+	const auto& args = fuseArgs.args;
 
 	// FUSE コンテキストの作成
 	struct fbjqlib::context_type app_ctx {
