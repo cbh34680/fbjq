@@ -1,16 +1,19 @@
 // lib/lib.cpp
 
 #include "lib.hpp"
+#include <cassert>
+#include <exception>
+#include <filesystem>
 #include <iostream>
-#include <vector>
+#include <alloca.h>
+#include <grp.h>
 #include <unistd.h>
 #include <pwd.h>
-#include <grp.h>
 #include <sdbus-c++/sdbus-c++.h>
-#include <filesystem>
 
 namespace fbjqlib {
 
+// ユーザ名から UID を取得する関数 (成功時: true, 失敗時: false)
 bool get_uid_by_name(const char* user_name, uid_t* out_uid)
 {
     struct passwd pwd;
@@ -22,9 +25,12 @@ bool get_uid_by_name(const char* user_name, uid_t* out_uid)
         buflen = 1024;
     }
 
-    std::vector<char> buffer(buflen);
+    constexpr size_t kMaxStackSize = 4096;
+    assert(static_cast<size_t>(buflen) <= kMaxStackSize && "Buffer size exceeds 4KB limit");
 
-    int res = ::getpwnam_r(user_name, &pwd, buffer.data(), buffer.size(), &result);
+    char* buf_ptr = static_cast<char*>(::alloca(buflen));
+
+    int res = ::getpwnam_r(user_name, &pwd, buf_ptr, buflen, &result);
 
     if (res == 0 && result != nullptr) {
         if (out_uid) {
@@ -48,9 +54,12 @@ bool get_gid_by_name(const char* group_name, gid_t* out_gid)
         buflen = 1024;
     }
 
-    std::vector<char> buffer(buflen);
+    constexpr size_t kMaxStackSize = 4096;
+    assert(static_cast<size_t>(buflen) <= kMaxStackSize && "Buffer size exceeds 4KB limit");
 
-    int res = ::getgrnam_r(group_name, &grp, buffer.data(), buffer.size(), &result);
+    char* buf_ptr = static_cast<char*>(::alloca(buflen));
+
+    int res = ::getgrnam_r(group_name, &grp, buf_ptr, buflen, &result);
 
     if (res == 0 && result != nullptr) {
         if (out_gid) {
@@ -76,29 +85,11 @@ static bool is_root_directory(const std::filesystem::path& p)
     return norm.parent_path() == norm;
 }
 
-std::unique_ptr<libconfig::Config> load_config(int argc, char** argv)
+std::unique_ptr<libconfig::Config> load_config(const char* config_file)
 {
-	int opt;
-	const char* config_file = "/etc/fbjq.conf";
-
-	while ((opt = ::getopt(argc, argv, "c:")) != -1) {
-        switch (opt) {
-            case 'c':
-                config_file = optarg;
-                break;
-
-            default:
-                // 不明なオプション、または引数が不足している場合
-                fprintf(stderr, "使用方法: %s [-c config_file]\n", argv[0]);
-                return nullptr;
-        }
-    }
-
-    // optind をリセットして、後続のコードで再度 getopt を使用できるようにする
-	optind = 1;
-
     // 設定ファイルの読み込み
-	auto app_cfg{ std::make_unique<libconfig::Config>() };
+	auto _appConfig{ std::make_unique<libconfig::Config>() };
+    auto* app_cfg{ _appConfig.get() };
 
 	try {
 		app_cfg->readFile(config_file);
@@ -111,7 +102,13 @@ std::unique_ptr<libconfig::Config> load_config(int argc, char** argv)
 				  << " 行: " << pex.getLine()
 				  << " エラー: " << pex.getError() << std::endl;
 		return nullptr;
-	}
+	} catch (const std::exception& ex) {
+        std::cerr << "error: " << ex.what() << std::endl;
+        return nullptr;
+    } catch (...) {
+        std::cerr << "unknown error" << std::endl;
+        return nullptr;
+    }
 
     auto fn_checkdir = [&app_cfg](const char* key) -> bool {
         if (! app_cfg->exists(key)) {
@@ -149,17 +146,22 @@ std::unique_ptr<libconfig::Config> load_config(int argc, char** argv)
 
     std::filesystem::path spool_dir{ app_cfg->lookup("spool_dir").c_str() };
 
-    if (! std::filesystem::exists(spool_dir / "queue")) {
-        std::cerr << (spool_dir / "queue") << ": not found" << std::endl;
+    const char* subdirs[] = { "tmp", "delivery", "dead", "queue", nullptr };
+    const char** subdir = subdirs;
+
+    for (; *subdir; ++subdir) {
+        if (! std::filesystem::exists(spool_dir / *subdir)) {
+            std::cerr << (spool_dir / *subdir) << ": not found" << std::endl;
+            return nullptr;
+        }
+    }
+
+    if (each_queue_items(app_cfg, [](const auto& q_item) { return true; }) <= 0) {
+        std::cerr << "有効な queue アイテムが見つかりません。" << std::endl;
         return nullptr;
     }
 
-    if (! std::filesystem::exists(spool_dir / "tmp")) {
-        std::cerr << (spool_dir / "tmp") << ": not found" << std::endl;
-        return nullptr;
-    }
-
-	return app_cfg;
+	return _appConfig;
 }
 
 bool is_valid_queue_item(const libconfig::Setting& q_item)
@@ -178,7 +180,7 @@ bool is_valid_queue_item(const libconfig::Setting& q_item)
 	return false;
 }
 
-int foreach_valid_queue_items(const libconfig::Config* cfg, std::function<bool(const libconfig::Setting&)> fn)
+int each_queue_items(const libconfig::Config* cfg, std::function<bool(const libconfig::Setting&)> fn)
 {
     int ret = -1;
 
@@ -230,10 +232,15 @@ bool systemd_unit_call_method(const std::string& unit_name, const std::string& m
         return true;
     }
     catch (const sdbus::Error& e) {
-        std::cerr << e.getName() << ": "
-                  << e.getMessage() << '\n';
+        std::cerr << "sbus error: " << e.what() << std::endl;
+        return false;
+	} catch (const std::exception& ex) {
+        std::cerr << "error: " << ex.what() << std::endl;
+        return false;
+    } catch (...) {
+        std::cerr << "unknown error" << std::endl;
         return false;
     }
 }
 
-}
+} // namespace

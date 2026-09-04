@@ -1,22 +1,24 @@
-// lib/lib.h
+// lib/lib.hpp
 
 #pragma once
 
-#include <libconfig.h++>
-#include <sys/types.h>
-#include <string>
-#include <memory>
-#include <functional>
 #include <filesystem>
+#include <functional>
+#include <memory>
+#include <string>
+#include <sys/types.h>
+#include <libconfig.h++>
 
 namespace fbjqlib {
+
+inline constexpr const char* DEFAULT_CONFIG_FILE = "/etc/fbjq.conf";
 
 // util.cpp で定義される関数の宣言
 bool get_uid_by_name(const char* user_name, uid_t* out_uid);
 bool get_gid_by_name(const char* group_name, gid_t* out_gid);
-std::unique_ptr<libconfig::Config> load_config(int argc, char** argv);
+std::unique_ptr<libconfig::Config> load_config(const char* config_file);
 bool is_valid_queue_item(const libconfig::Setting& q_item);
-int foreach_valid_queue_items(const libconfig::Config* cfg, std::function<bool(const libconfig::Setting&)> fn);
+int each_queue_items(const libconfig::Config* cfg, std::function<bool(const libconfig::Setting&)> fn);
 bool systemd_unit_call_method(const std::string& unit_name, const std::string& method);
 
 // handler.cpp で定義される関数の宣言

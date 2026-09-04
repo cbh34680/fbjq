@@ -1,10 +1,9 @@
 // fs/main.cpp
 
 #include "local.hpp"
-#include <iostream>
-#include <vector>
-#include <filesystem>
 #include <algorithm>
+#include <filesystem>
+#include <iostream>
 #include <unistd.h>
 
 struct FuseArgsHelper
@@ -23,7 +22,7 @@ struct FuseArgsHelper
         fuse_opt_add_arg(&args, "-o");
         fuse_opt_add_arg(&args, "default_permissions");
         fuse_opt_add_arg(&args, "-o");
-        fuse_opt_add_arg(&args, "fsname=fbjq");
+        fuse_opt_add_arg(&args, "fsname=fbjq-fs");
         fuse_opt_add_arg(&args, "-o");
         fuse_opt_add_arg(&args, "auto_unmount");
         fuse_opt_add_arg(&args, mountpoint.c_str());
@@ -40,13 +39,13 @@ struct SystemdUnitHelper
 	bool success = false;
 	const libconfig::Config* app_cfg;
 
-	SystemdUnitHelper(const libconfig::Config* app_cfg_arg, const std::filesystem::path spool_dir)
+	SystemdUnitHelper(const libconfig::Config* app_cfg_arg, const std::filesystem::path& spool_dir)
 		: app_cfg{ app_cfg_arg }
 	{
 		namespace fs = std::filesystem;
 
 		// .path ユニットの起動関数
-		auto fn_start = [&spool_dir](const libconfig::Setting& q_item) -> bool {
+		auto fn_start = [&spool_dir](const auto& q_item) -> bool {
 			std::string unit_name{ "fbjq-executor@" };
 			unit_name += q_item.getName();
 			unit_name += ".path";
@@ -81,10 +80,7 @@ struct SystemdUnitHelper
 		};
 
 		// .path ユニットの起動
-		if (fbjqlib::foreach_valid_queue_items(app_cfg, fn_start) <= 0) {
-			std::cerr << "有効な queue アイテムが見つかりません。" << std::endl;
-			return;
-		}
+		fbjqlib::each_queue_items(app_cfg, fn_start);
 
 		success = true;
 	}
@@ -92,7 +88,8 @@ struct SystemdUnitHelper
 	~SystemdUnitHelper()
 	{
 		// .path ユニットの停止関数
-		auto fn_stop = [](const libconfig::Setting& q_item) -> bool {
+		//auto fn_stop = [](const libconfig::Setting& q_item) -> bool {
+		auto fn_stop = [](const auto& q_item) -> bool {
 			std::string unit_name{ "fbjq-executor@" };
 			unit_name += q_item.getName();
 			unit_name += ".path";
@@ -101,7 +98,7 @@ struct SystemdUnitHelper
 		};
 
 		// .path ユニットの停止
-		fbjqlib::foreach_valid_queue_items(app_cfg, fn_stop);
+		fbjqlib::each_queue_items(app_cfg, fn_stop);
 	}
 };
 
@@ -109,15 +106,44 @@ int main(int argc, char** argv)
 {
 	namespace fs = std::filesystem;
 
+	int opt;
+	const char* config_file = fbjqlib::DEFAULT_CONFIG_FILE;
+	bool check_only = false;
+
+	while ((opt = ::getopt(argc, argv, "cf:")) != -1) {
+        switch (opt) {
+			case 'c':
+				check_only = true;
+				break;
+            case 'f':
+                config_file = optarg;
+                break;
+
+            default:
+                // 不明なオプション、または引数が不足している場合
+                fprintf(stderr, "使用方法: %s [-f config_file]\n", argv[0]);
+                return EXIT_FAILURE;
+        }
+    }
+
+    // optind をリセットして、後続のコードで再度 getopt を使用できるようにする
+	optind = 1;
+
 	::umask(0);
 
 	// 設定ファイルの読み込み
-	auto _appConfig{ fbjqlib::load_config(argc, argv) };
-	if (! _appConfig) {
+	auto _appConfig{ fbjqlib::load_config(config_file) };
+	if (_appConfig) {
+		if (check_only) {
+			std::cerr << "Config OK";
+			return EXIT_SUCCESS;
+		}
+	} else {
+		std::cerr << "Config Error";
 		return EXIT_FAILURE;
 	}
-	const auto* app_cfg{ _appConfig.get() };
 
+	const auto* app_cfg{ _appConfig.get() };
 	fs::path mountpoint{ app_cfg->lookup("mountpoint").c_str() };
 	fs::path spool_dir{ app_cfg->lookup("spool_dir").c_str() };
 

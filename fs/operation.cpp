@@ -1,4 +1,4 @@
-// fs/handler.cpp
+// fs/operation.cpp
 
 #include "local.hpp"
 #include <iostream>
@@ -95,12 +95,12 @@ static int fbjq_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off
 	filler(buf, ".",  nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
 	filler(buf, "..", nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
 
-	auto fn = [buf, filler](const libconfig::Setting& q_item) -> bool {
+	auto fn = [buf, filler](const auto& q_item) -> bool {
 		filler(buf, q_item.getName(), nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
 		return true;
 	};
 
-	fbjqlib::foreach_valid_queue_items(APP_CTX()->cfg, fn);
+	fbjqlib::each_queue_items(APP_CTX()->cfg, fn);
 
 	return 0;
 }
