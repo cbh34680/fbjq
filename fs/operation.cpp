@@ -55,12 +55,14 @@ static int fbjq_getattr(const char* path, struct stat* stbuf, struct fuse_file_i
 		return -ENOENT;
 	}
 
+	const char* q_name = path + 1;
 	fbjqlib::queue_item_t q_item;
-	if (! fbjqlib::get_queue_item(app_cfg, path + 1, &q_item)) {
+
+	if (! fbjqlib::get_queue_item(app_cfg, q_name, &q_item)) {
 		return -ENOENT;
 	}
 
-	stbuf->st_mode = S_IFREG | 0620;
+	stbuf->st_mode = S_IFREG | 0220;
 	stbuf->st_nlink = 1;
 	stbuf->st_uid = q_item.exec_user_uid;
 	stbuf->st_gid = q_item.allow_group_gid;
@@ -113,9 +115,10 @@ static int fbjq_open(const char *path, struct fuse_file_info *fi)
 
 	const struct fuse_context* fuse_ctx = fuse_get_context();
 
+	const char* q_name = path + 1;
 	fbjqlib::queue_item_t q_item;
 
-	if (! fbjqlib::get_queue_item(APP_CTX()->app_cfg, path + 1, &q_item)) {
+	if (! fbjqlib::get_queue_item(APP_CTX()->app_cfg, q_name, &q_item)) {
 		return -ENOENT;
 	}
 
@@ -126,16 +129,8 @@ static int fbjq_open(const char *path, struct fuse_file_info *fi)
 
 	const auto outpath{ APP_CTX()->spool_dir / "tmp" / filename };
 
-	const int fh = ::open(outpath.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0400);
-	if (fh == -1) {
-		return -errno;
-	}
-
-	if (::fchown(fh, q_item.exec_user_uid, fbjqlib::DEFAULT_FILE_GROUP) != 0) {
-		return -errno;
-	}
-
-	const fbjqlib::request_header_t header{
+	fbjqlib::request_header_t header
+	{
 		.magic				= { 'F', 'B', 'J', 'Q', },
 		.caller_uid			= static_cast<uint32_t>(fuse_ctx->uid),
 		.caller_gid			= static_cast<uint32_t>(fuse_ctx->gid),
@@ -144,21 +139,48 @@ static int fbjq_open(const char *path, struct fuse_file_info *fi)
 		.fuse_tid			= static_cast<int32_t>(tid),
 		.exec_user_uid		= static_cast<uint32_t>(q_item.exec_user_uid),
 		.allow_group_gid	= static_cast<uint32_t>(q_item.allow_group_gid),
+		.queue_name			= { '\0' },
+		.cigam				= { 'Q', 'J', 'B', 'F' },
 	};
 
-	const ssize_t written = TEMP_FAILURE_RETRY(::write(fh, &header, sizeof(header)));
+	::strncpy(header.queue_name, q_name, sizeof(header.queue_name));
 
-	if (written == -1) {
+	// write header
+	const int fh = ::open(outpath.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0400);
+	if (fh == -1) {
 		return -errno;
 	}
 
+	int ret = 0;
+	ssize_t written = -1;
+
+	if (::fchown(fh, q_item.exec_user_uid, fbjqlib::DEFAULT_FILE_GROUP) != 0) {
+		ret = -errno;
+		goto EXIT_LABEL;
+	}
+
+	written = TEMP_FAILURE_RETRY(::write(fh, &header, sizeof(header)));
+	if (written == -1) {
+		ret = -errno;
+		goto EXIT_LABEL;
+	}
+
 	if (written != sizeof(header)) {
-		return -EIO;
+		ret = -EIO;
+		goto EXIT_LABEL;
 	}
 
 	fi->fh = fh;
+	ret = 0;
 
-	return 0;
+EXIT_LABEL:
+	if (ret != 0) {
+		::close(fh);
+	}
+
+	return ret;
+
+
 }
 
 static int fbjq_write(const char* path, const char* buf, size_t size, off_t offset, struct fuse_file_info *fi)
@@ -166,7 +188,7 @@ static int fbjq_write(const char* path, const char* buf, size_t size, off_t offs
 	(void) path;
 
 	const int fd = static_cast<int>(fi->fh);
-	if (fd <= 0) {
+	if (fd < 0) {
 		return -EBADF;
 	}
 
@@ -183,7 +205,7 @@ static int fbjq_release(const char* path, struct fuse_file_info* fi)
 	(void) path;
 
 	const int fd = static_cast<int>(fi->fh);
-	if (fd <= 0) {
+	if (fd < 0) {
 		return -EBADF;
 	}
 

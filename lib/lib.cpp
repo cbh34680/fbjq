@@ -2,6 +2,7 @@
 
 #include "lib.hpp"
 #include <cassert>
+#include <algorithm>
 #include <chrono>
 #include <exception>
 #include <filesystem>
@@ -32,20 +33,28 @@ std::filesystem::path get_path_from_fd(int fd)
     return target;
 }
 
-// ユーザ名から UID を取得する関数 (成功時: true, 失敗時: false)
+// ユーザー名から UID を取得する関数 (成功時: true, 失敗時: false)
 bool get_uid_by_name(const char* user_name, uid_t* out_uid)
 {
     struct passwd pwd;
     struct passwd* result = nullptr;
-    
-    // システムの推奨バッファサイズを取得 (取得できない場合はデフォルト値を採用)
-    long buflen = ::sysconf(_SC_GETPW_R_SIZE_MAX);
-    if (buflen == -1) {
-        buflen = 1024;
+
+    // システムの推奨バッファサイズを取得
+    long sys_buflen = ::sysconf(_SC_GETPW_R_SIZE_MAX);
+    if (sys_buflen <= 0) {
+        sys_buflen = 1024;
     }
 
+    const size_t buflen = static_cast<size_t>(sys_buflen);
+
     constexpr size_t kMaxStackSize = 4096;
-    assert(static_cast<size_t>(buflen) <= kMaxStackSize && "Buffer size exceeds 4KB limit");
+    
+    // 警告の原因となる assert 内の文字列結合 (&& "...") をやめて単純比較にする
+    assert(buflen <= kMaxStackSize);
+
+    if (buflen > kMaxStackSize) {
+        return false;
+    }
 
     char* buf_ptr = static_cast<char*>(::alloca(buflen));
 
@@ -58,7 +67,7 @@ bool get_uid_by_name(const char* user_name, uid_t* out_uid)
         return true;
     }
 
-    return false; // エラーまたはユーザーが存在しない場合
+    return false;
 }
 
 // グループ名から GID を取得する関数 (成功時: true, 失敗時: false)
@@ -66,15 +75,23 @@ bool get_gid_by_name(const char* group_name, gid_t* out_gid)
 {
     struct group grp;
     struct group* result = nullptr;
-    
-    // システムの推奨バッファサイズを取得 (取得できない場合はデフォルト値を採用)
-    long buflen = ::sysconf(_SC_GETGR_R_SIZE_MAX);
-    if (buflen == -1) {
-        buflen = 1024;
+
+    // システムの推奨バッファサイズを取得
+    long sys_buflen = ::sysconf(_SC_GETGR_R_SIZE_MAX);
+    if (sys_buflen <= 0) {
+        sys_buflen = 1024;
     }
 
+    const size_t buflen = static_cast<size_t>(sys_buflen);
+
     constexpr size_t kMaxStackSize = 4096;
-    assert(static_cast<size_t>(buflen) <= kMaxStackSize && "Buffer size exceeds 4KB limit");
+    
+    // 警告の原因となる assert 内の文字列結合 (&& "...") をやめて単純比較にする
+    assert(buflen <= kMaxStackSize);
+
+    if (buflen > kMaxStackSize) {
+        return false;
+    }
 
     char* buf_ptr = static_cast<char*>(::alloca(buflen));
 
@@ -88,7 +105,7 @@ bool get_gid_by_name(const char* group_name, gid_t* out_gid)
         return true;
     }
 
-    return false; // エラーまたはグループが存在しない場合
+    return false;
 }
 
 static bool is_root_directory(const std::filesystem::path& path)
@@ -129,38 +146,28 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
         return nullptr;
     }
 
-    auto check_dir = [&app_cfg](const char* key) -> bool {
-        std::string path_str;
-        if (! app_cfg->lookupValue(key, path_str)) {
-            std::cerr << "設定ファイルに '" << key << "' が見つかりません。" << std::endl;
-            return false;
-        }
-
-        std::filesystem::path path{ path_str };
-
-        if (path.empty()) {
-            std::cerr << "設定ファイルの '" << key << "' が空です。" << std::endl;
-            return false;
-        }
-
-        if (is_root_directory(path)) {
-            std::cerr << "設定ファイルの '" << key << "' がルートディレクトリです。" << std::endl;
-            return false;
-        }
-
-        if (! std::filesystem::is_directory(path)) {
-            std::cerr << "`" << path << "': not directory" << std::endl;
-            return false;
-        }
-
-        return true;
-    };
-
-    if (! check_dir("spool_dir")) {
+    std::string path_str;
+    if (! app_cfg->lookupValue("spool_dir", path_str)) {
+        std::cerr << "設定ファイルに 'spool_dir' が見つかりません。" << std::endl;
         return nullptr;
     }
 
-    std::filesystem::path spool_dir{ app_cfg->lookup("spool_dir").c_str() };
+    std::filesystem::path spool_dir{ path_str };
+
+    if (spool_dir.empty()) {
+        std::cerr << "設定ファイルの '" << spool_dir << "' が空です。" << std::endl;
+        return nullptr;
+    }
+
+    if (is_root_directory(spool_dir)) {
+        std::cerr << "設定ファイルの '" << spool_dir << "' がルートディレクトリです。" << std::endl;
+        return nullptr;
+    }
+
+    if (! std::filesystem::is_directory(spool_dir)) {
+        std::cerr << "`" << spool_dir << "': not directory" << std::endl;
+        return nullptr;
+    }
 
     const char* subdirs[] = { "tmp", "delivery", "dead", "queue", nullptr };
     const char** subdir = subdirs;
@@ -202,11 +209,14 @@ static bool get_queue_item_internal(const libconfig::Setting &q_item, queue_item
     int max_process = 1;
     q_item.lookupValue("max_process", max_process);
 
+    /*
     if (max_process <= 0) {
         max_process = 1;
     } else if (max_process > QUEUE_MAX_PROCESS) {
         max_process = 32;
     }
+    */
+    max_process = std::clamp(max_process, 1, QUEUE_MAX_PROCESS);
 
     uid_t exec_user_uid;
     if (! fbjqlib::get_uid_by_name(exec_user, &exec_user_uid)) {

@@ -54,9 +54,12 @@ struct request_header_t {
 	int32_t fuse_tid;
 	uint32_t exec_user_uid;
 	uint32_t allow_group_gid;
+	char queue_name[QUEUE_NAME_MAXLEN + 1];
+	unsigned char filler[28];
+	char cigam[4];
 };
 
-static_assert(sizeof(request_header_t) == 32, "Header size must be 32 bytes");
+static_assert(sizeof(request_header_t) == 96, "Header size must be 96 bytes");
 static_assert(std::is_trivial<request_header_t>::value, "Header must be trivial");
 
 }

@@ -64,7 +64,9 @@ struct SystemdUnitHelper
 		};
 
 		// .path ユニットの起動
-		fbjqlib::for_each_queue_item(app_cfg, start_unit);
+		if (fbjqlib::for_each_queue_item(app_cfg, start_unit) <= 0) {
+			return;
+		}
 
 		success = true;
 	}
@@ -89,8 +91,8 @@ struct SystemdUnitHelper
 
 struct app_args_t
 {
-    int check_only = 0;
-    const char* cfg_file = nullptr;
+    int check_only{ 0 };
+    const char* cfg_file{ nullptr };
 };
 
 #define APP_OPT(t, p, v) { t, offsetof(struct app_args_t, p), v }
@@ -120,6 +122,10 @@ int main(int argc, char** argv)
     if (::fuse_opt_parse(&args, &app_args, app_opts, nullptr) == -1) {
         return EXIT_FAILURE;
     }
+
+	if (! app_args.cfg_file) {
+		app_args.cfg_file = fbjqlib::DEFAULT_CONFIG_FILE;
+	}
 
 	// 設定ファイルの読み込み
 	auto appConfigPtr{ fbjqlib::load_config(app_args.cfg_file) };
