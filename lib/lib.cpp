@@ -129,13 +129,14 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
         return nullptr;
     }
 
-    auto checkdir = [&app_cfg](const char* key) -> bool {
-        if (! app_cfg->exists(key)) {
+    auto check_dir = [&app_cfg](const char* key) -> bool {
+        std::string path_str;
+        if (! app_cfg->lookupValue(key, path_str)) {
             std::cerr << "設定ファイルに '" << key << "' が見つかりません。" << std::endl;
             return false;
         }
 
-        std::filesystem::path path{ app_cfg->lookup(key).c_str() };
+        std::filesystem::path path{ path_str };
 
         if (path.empty()) {
             std::cerr << "設定ファイルの '" << key << "' が空です。" << std::endl;
@@ -155,11 +156,11 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
         return true;
     };
 
-    if (! checkdir("mountpoint")) {
+    if (! check_dir("mountpoint")) {
         return nullptr;
     }
 
-    if (! checkdir("spool_dir")) {
+    if (! check_dir("spool_dir")) {
         return nullptr;
     }
 
@@ -175,10 +176,10 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
         }
     }
 
-    auto noop = [](const char* q_name, const auto& q_item) {
+    const auto noop = [](const char* q_name, const auto& q_item) {
         (void) q_name;
         (void) q_item;
-        
+
         return true;
     };
 
@@ -267,15 +268,21 @@ int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(con
             for (int i = 0; i < q_len; ++i) {
                 const char* q_name = queue[i].getName();
 
+                const auto q_name_len = std::strlen(q_name);
+                if (q_name_len <= 0 || q_name_len > QUEUE_NAME_MAXLEN) {
+                    std::cerr << q_name << ": invalid name length" << std::endl;
+                    continue;
+                }
+
                 queue_item q_item;
                 if (! get_queue_item_internal(queue[i], &q_item)) {
                     std::cerr << q_name << ": invalid name" << std::endl;
                     continue;
                 }
 
-                if (! callback(q_name, q_item))
-                {
-                    return -1; // コールバックが false を返した場合、処理を中断して -1 を返す
+                if (! callback(q_name, q_item)) {
+                    // コールバックが false を返した場合、処理を中断して -1 を返す
+                    return -1;
                 }
 
                 item_count++; // 有効なアイテムが見つかった場合にカウントを増やす

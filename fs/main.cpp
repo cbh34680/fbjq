@@ -15,7 +15,7 @@ struct FuseArgsHelper
 		fuse_opt_add_arg(&args, progname);
         fuse_opt_add_arg(&args, "-f");
 #if defined(DEBUG)
-        //fuse_opt_add_arg(&args, "-d");
+        fuse_opt_add_arg(&args, "-d");
 #endif
         fuse_opt_add_arg(&args, "-o");
         fuse_opt_add_arg(&args, "allow_other");
@@ -45,7 +45,7 @@ struct SystemdUnitHelper
 		namespace fs = std::filesystem;
 
 		// .path ユニットの起動関数
-		auto start_unit = [&spool_dir](const char* q_name, const auto& q_item) -> bool {
+		const auto start_unit = [&spool_dir](const char* q_name, const auto& q_item) -> bool {
 			std::string unit_name{ "fbjq-executor@" };
 			unit_name += q_name;
 			unit_name += ".path";
@@ -62,7 +62,6 @@ struct SystemdUnitHelper
 				}
 			}
 
-			// 
 			if (::chown(subdir.c_str(), q_item.exec_user_uid, fbjqlib::DEFAULT_FILE_GROUP) != 0) {
 				std::cerr << "error: chown" << std::endl;
 				return false;
@@ -85,8 +84,7 @@ struct SystemdUnitHelper
 	~SystemdUnitHelper()
 	{
 		// .path ユニットの停止関数
-		//auto fn_stop = [](const libconfig::Setting& q_item) -> bool {
-		auto stop_unit = [](const char* q_name, const auto& q_item) -> bool {
+		const auto stop_unit = [](const char* q_name, const auto& q_item) -> bool {
 			(void) q_item;
 
 			std::string unit_name{ "fbjq-executor@" };
@@ -149,18 +147,18 @@ int main(int argc, char** argv)
 	const char* cfg_file = fbjqlib::DEFAULT_CONFIG_FILE;
 	bool check_only = false;
 
-	while ((opt = ::getopt(argc, argv, "cf:")) != -1) {
+	while ((opt = ::getopt(argc, argv, "Cc:")) != -1) {
         switch (opt) {
-			case 'c':
+			case 'C':
 				check_only = true;
 				break;
-            case 'f':
+            case 'c':
                 cfg_file = optarg;
                 break;
 
             default:
                 // 不明なオプション、または引数が不足している場合
-                fprintf(stderr, "使用方法: %s [-f cfg_file]\n", argv[0]);
+                fprintf(stderr, "使用方法: %s [-c cfg_file]\n", argv[0]);
                 return EXIT_FAILURE;
         }
     }

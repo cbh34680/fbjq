@@ -16,6 +16,7 @@ namespace fbjqlib {
 inline constexpr const char* DEFAULT_CONFIG_FILE = "/etc/fbjq.conf";
 inline constexpr gid_t DEFAULT_FILE_GROUP = static_cast<gid_t>(0);
 inline constexpr int QUEUE_MAX_PROCESS = 32;
+inline constexpr int QUEUE_NAME_MAXLEN = 31;
 
 struct queue_item {
 	const char* exec_user{ nullptr };

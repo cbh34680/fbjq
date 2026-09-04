@@ -1,0 +1,10 @@
+#/etc/systemd/system/fbjq-delivery.service
+
+[Unit]
+Description=FBJQ delivery Worker for Queue /var/fbjq/delivery
+
+[Service]
+Type=oneshot
+ExecStart=/root/work/fbjq/build/debug/delivery/fbjq-delivery
+Slice=system.Slice
+
