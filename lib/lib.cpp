@@ -2,6 +2,7 @@
 
 #include "lib.hpp"
 #include <cassert>
+#include <chrono>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -10,6 +11,26 @@
 #include <sdbus-c++/sdbus-c++.h>
 
 namespace fbjqlib {
+
+// ナノ秒精度のモノトニックタイムスタンプ
+uint64_t now_nanos()
+{
+    const auto now = std::chrono::steady_clock::now();
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+}
+
+std::filesystem::path get_path_from_fd(int fd)
+{
+    std::string proc_path = "/proc/self/fd/" + std::to_string(fd);
+    std::error_code ec;
+    
+    std::filesystem::path target = std::filesystem::read_symlink(proc_path, ec);
+    if (ec) {
+        return "";
+    }
+
+    return target;
+}
 
 // ユーザ名から UID を取得する関数 (成功時: true, 失敗時: false)
 bool get_uid_by_name(const char* user_name, uid_t* out_uid)
@@ -155,8 +176,8 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
     }
 
     auto noop = [](const char* q_name, const auto& q_item) {
-        (void)q_name;
-        (void)q_item;
+        (void) q_name;
+        (void) q_item;
         
         return true;
     };
@@ -278,9 +299,7 @@ bool call_systemd_unit_method(const std::string& unit_name, const std::string& m
 
         proxy->callMethod(method)
             .onInterface("org.freedesktop.systemd1.Manager")
-            .withArguments(
-                unit_name,
-                "replace")
+            .withArguments(unit_name, "replace")
             .storeResultsTo(job);
 
         std::cout << job << '\n';

@@ -14,6 +14,7 @@
 namespace fbjqlib {
 
 inline constexpr const char* DEFAULT_CONFIG_FILE = "/etc/fbjq.conf";
+inline constexpr gid_t DEFAULT_FILE_GROUP = static_cast<gid_t>(0);
 inline constexpr int QUEUE_MAX_PROCESS = 32;
 
 struct queue_item {
@@ -25,6 +26,8 @@ struct queue_item {
 };
 
 // util.cpp で定義される関数の宣言
+uint64_t now_nanos();
+std::filesystem::path get_path_from_fd(int fd);
 bool get_uid_by_name(const char* user_name, uid_t* out_uid);
 bool get_gid_by_name(const char* group_name, gid_t* out_gid);
 
@@ -41,5 +44,19 @@ struct context_type {
 	const std::filesystem::path& spool_dir;
 	const time_t boot_time{ static_cast<time_t>(-1) };
 };
+
+struct request_file_header {
+	char magic[4];
+	uint32_t caller_uid;
+	uint32_t caller_gid;
+	int32_t caller_pid;
+	int32_t fuse_pid;
+	int32_t fuse_tid;
+	uint32_t exec_user_uid;
+	uint32_t allow_group_gid;
+};
+
+static_assert(sizeof(request_file_header) == 32, "Header size must be 32 bytes");
+static_assert(std::is_trivial<request_file_header>::value, "Header must be trivial");
 
 }

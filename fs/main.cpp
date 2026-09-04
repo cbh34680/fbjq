@@ -15,7 +15,7 @@ struct FuseArgsHelper
 		fuse_opt_add_arg(&args, progname);
         fuse_opt_add_arg(&args, "-f");
 #if defined(DEBUG)
-        fuse_opt_add_arg(&args, "-d");
+        //fuse_opt_add_arg(&args, "-d");
 #endif
         fuse_opt_add_arg(&args, "-o");
         fuse_opt_add_arg(&args, "allow_other");
@@ -63,7 +63,7 @@ struct SystemdUnitHelper
 			}
 
 			// 
-			if (::chown(subdir.c_str(), q_item.exec_user_uid, 0) != 0) {
+			if (::chown(subdir.c_str(), q_item.exec_user_uid, fbjqlib::DEFAULT_FILE_GROUP) != 0) {
 				std::cerr << "error: chown" << std::endl;
 				return false;
 			}
@@ -87,7 +87,7 @@ struct SystemdUnitHelper
 		// .path ユニットの停止関数
 		//auto fn_stop = [](const libconfig::Setting& q_item) -> bool {
 		auto stop_unit = [](const char* q_name, const auto& q_item) -> bool {
-			(void)q_item;
+			(void) q_item;
 
 			std::string unit_name{ "fbjq-executor@" };
 			unit_name += q_name;
@@ -101,10 +101,50 @@ struct SystemdUnitHelper
 	}
 };
 
-int main(int argc, char** argv)
+static int mount_filesystem(const char* progname, const char* cfg_file, bool check_only)
 {
 	namespace fs = std::filesystem;
 
+	// 設定ファイルの読み込み
+	auto appConfigPtr{ fbjqlib::load_config(cfg_file) };
+	if (appConfigPtr) {
+		if (check_only) {
+			std::cerr << "Config OK";
+			return EXIT_SUCCESS;
+		}
+	} else {
+		std::cerr << "Config Error";
+		return EXIT_FAILURE;
+	}
+
+	const auto* app_cfg{ appConfigPtr.get() };
+	fs::path mountpoint{ app_cfg->lookup("mountpoint").c_str() };
+	fs::path spool_dir{ app_cfg->lookup("spool_dir").c_str() };
+
+	// FUSE の引数を生成
+	FuseArgsHelper fuseArgs{ progname, mountpoint };
+	const auto& args = fuseArgs.args;
+
+	// FUSE コンテキストの作成
+	struct fbjqlib::context_type app_ctx {
+		.app_cfg = app_cfg,
+		//.mountpoint = mountpoint,
+		.spool_dir = spool_dir,
+		.boot_time = std::time(nullptr),
+	};
+
+	// systemd ユニットの起動
+	SystemdUnitHelper sdUnit{ app_cfg, spool_dir };
+	if (! sdUnit.success) {
+		return EXIT_FAILURE;
+	}
+
+	// FUSE メインループの開始
+	return ::fuse_main(args.argc, args.argv, fbjq_operations(), &app_ctx);
+}
+
+int main(int argc, char** argv)
+{
 	int opt;
 	const char* cfg_file = fbjqlib::DEFAULT_CONFIG_FILE;
 	bool check_only = false;
@@ -130,40 +170,7 @@ int main(int argc, char** argv)
 
 	::umask(0);
 
-	// 設定ファイルの読み込み
-	auto appConfigPtr{ fbjqlib::load_config(cfg_file) };
-	if (appConfigPtr) {
-		if (check_only) {
-			std::cerr << "Config OK";
-			return EXIT_SUCCESS;
-		}
-	} else {
-		std::cerr << "Config Error";
-		return EXIT_FAILURE;
-	}
-
-	const auto* app_cfg{ appConfigPtr.get() };
-	fs::path mountpoint{ app_cfg->lookup("mountpoint").c_str() };
-	fs::path spool_dir{ app_cfg->lookup("spool_dir").c_str() };
-
-	// FUSE の引数を生成
-	FuseArgsHelper fuseArgs{ argv[0], mountpoint };
-	const auto& args = fuseArgs.args;
-
-	// FUSE コンテキストの作成
-	struct fbjqlib::context_type app_ctx {
-		.app_cfg = app_cfg,
-		//.mountpoint = mountpoint,
-		.spool_dir = spool_dir,
-		.boot_time = ::time(nullptr),
-	};
-
-	// systemd ユニットの起動
-	SystemdUnitHelper sdUnit{ app_cfg, spool_dir };
-	if (! sdUnit.success) {
-		return EXIT_FAILURE;
-	}
-
-	// FUSE メインループの開始
-	return fuse_main(args.argc, args.argv, fbjq_operations(), &app_ctx);
+	return mount_filesystem(argv[0], cfg_file, check_only);
 }
+
+

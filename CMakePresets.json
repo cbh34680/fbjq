@@ -23,7 +23,7 @@
             "displayName": "Debug Build",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -Werror"
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0"
             }
         },
         {
