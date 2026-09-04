@@ -41,6 +41,38 @@
             "preLaunchTask": "build-fs"
         },
         {
+            "name": "Debug fbjq-delivery",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/debug/delivery/fbjq-delivery",
+            "args": [
+                "-c" , "${workspaceFolder}/etc/fbjq.conf",
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "SIGINT をデバッガで止めずにアプリへ渡す",
+                    "text": "handle SIGINT pass nostop noprint",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "SIGTERMでも停止させずアプリに直接渡す",
+                    "text": "handle SIGTERM pass nostop noprint",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build-delivery"
+        },
+        {
             "name": "Debug fbjq-executor",
             "type": "cppdbg",
             "request": "launch",

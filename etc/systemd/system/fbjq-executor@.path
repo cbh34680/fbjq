@@ -1,5 +1,4 @@
 # /etc/systemd/system/fbjq-executor@.path
-
 [Unit]
 Description=Watch queue directory /var/fbjq/queue/%I
 

@@ -1,5 +1,4 @@
 # fs/CMakeLists.txt
-
 add_executable(fbjq-fs main.cpp operation.cpp)
 
 target_compile_definitions(fbjq-fs PRIVATE
@@ -17,11 +16,5 @@ target_compile_definitions(fbjq-fs PRIVATE FUSE_USE_VERSION=31)
 target_link_libraries(fbjq-fs PRIVATE fbjq-lib)
 
 # print
-get_target_property(FBJQ_FS_INCLUDES fbjq-fs INCLUDE_DIRECTORIES)
-message(STATUS "fbjq-fs include dirs = ${FBJQ_FS_INCLUDES}")
-
 get_target_property(FBJQ_FS_LIBS fbjq-fs LINK_LIBRARIES)
 message(STATUS "fbjq-fs link libs = ${FBJQ_FS_LIBS}")
-
-get_target_property(FBJQ_FS_CFLAGS fbjq-fs COMPILE_OPTIONS)
-message(STATUS "fbjq-fs cflags = ${FBJQ_FS_CFLAGS}")

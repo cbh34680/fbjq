@@ -12,6 +12,15 @@
         },
         {
             "type": "shell",
+            "label": "build-delivery",
+            "command": "cmake --build build/debug --target fbjq-delivery",
+            "group": "build",
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "type": "shell",
             "label": "build-executor",
             "command": "cmake --build build/debug --target fbjq-executor",
             "group": "build",

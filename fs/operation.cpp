@@ -1,5 +1,4 @@
 // fs/operation.cpp
-
 #include "local.hpp"
 #include <iostream>
 #include <cstring>
@@ -140,6 +139,7 @@ static int fbjq_open(const char *path, struct fuse_file_info *fi)
 		.exec_user_uid		= static_cast<uint32_t>(q_item.exec_user_uid),
 		.allow_group_gid	= static_cast<uint32_t>(q_item.allow_group_gid),
 		.queue_name			= { '\0' },
+		.filler				= { '\0' },
 		.cigam				= { 'Q', 'J', 'B', 'F' },
 	};
 
@@ -151,36 +151,34 @@ static int fbjq_open(const char *path, struct fuse_file_info *fi)
 		return -errno;
 	}
 
-	int ret = 0;
+	int rc = 0;
 	ssize_t written = -1;
 
 	if (::fchown(fh, q_item.exec_user_uid, fbjqlib::DEFAULT_FILE_GROUP) != 0) {
-		ret = -errno;
+		rc = -errno;
 		goto EXIT_LABEL;
 	}
 
 	written = TEMP_FAILURE_RETRY(::write(fh, &header, sizeof(header)));
 	if (written == -1) {
-		ret = -errno;
+		rc = -errno;
 		goto EXIT_LABEL;
 	}
 
 	if (written != sizeof(header)) {
-		ret = -EIO;
+		rc = -EIO;
 		goto EXIT_LABEL;
 	}
 
 	fi->fh = fh;
-	ret = 0;
+	rc = 0;
 
 EXIT_LABEL:
-	if (ret != 0) {
+	if (rc != 0) {
 		::close(fh);
 	}
 
-	return ret;
-
-
+	return rc;
 }
 
 static int fbjq_write(const char* path, const char* buf, size_t size, off_t offset, struct fuse_file_info *fi)

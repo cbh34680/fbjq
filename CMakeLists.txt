@@ -18,4 +18,5 @@ message(STATUS "CXX Flags (Release): ${CMAKE_CXX_FLAGS_RELEASE}")
 
 add_subdirectory(lib)
 add_subdirectory(fs)
+add_subdirectory(delivery)
 add_subdirectory(executor)

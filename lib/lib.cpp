@@ -1,5 +1,4 @@
 // lib/lib.cpp
-
 #include "lib.hpp"
 #include <cassert>
 #include <algorithm>

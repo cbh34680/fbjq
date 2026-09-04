@@ -1,5 +1,4 @@
 # /etc/systemd/system/fbjq-executor@.service
-
 [Unit]
 Description=FBJQ Executor Worker for Queue /var/fbjq/queue/%I
 

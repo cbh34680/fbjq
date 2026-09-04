@@ -1,5 +1,4 @@
 #/etc/systemd/system/fbjq-delivery.path
-
 [Unit]
 Description=Watch queue directory /var/fbjq/delivery
 
