@@ -156,10 +156,6 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
         return true;
     };
 
-    if (! check_dir("mountpoint")) {
-        return nullptr;
-    }
-
     if (! check_dir("spool_dir")) {
         return nullptr;
     }
@@ -191,7 +187,7 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
 	return appConfigPtr;
 }
 
-static bool get_queue_item_internal(const libconfig::Setting &q_item, queue_item* out)
+static bool get_queue_item_internal(const libconfig::Setting &q_item, queue_item_t* out)
 {
     const char* exec_user = nullptr;
     if (! q_item.lookupValue("exec_user", exec_user)) {
@@ -231,7 +227,7 @@ static bool get_queue_item_internal(const libconfig::Setting &q_item, queue_item
     return true;
 }
 
-bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_item* out)
+bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_item_t* out)
 {
     if (! app_cfg->exists("queue")) {
         return false;
@@ -253,7 +249,7 @@ bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_
     return true;
 }
 
-int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(const char*, const queue_item&)> callback)
+int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(const char*, const queue_item_t&)> callback)
 {
     int item_count = -1;
 
@@ -274,7 +270,7 @@ int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(con
                     continue;
                 }
 
-                queue_item q_item;
+                queue_item_t q_item;
                 if (! get_queue_item_internal(queue[i], &q_item)) {
                     std::cerr << q_name << ": invalid name" << std::endl;
                     continue;

@@ -5,7 +5,7 @@
 #include <cstring>
 #include <sys/syscall.h>
 
-#define APP_CTX() static_cast<fbjqlib::context_type*>(fuse_get_context()->private_data)
+#define APP_CTX() static_cast<fbjqlib::app_context_t*>(fuse_get_context()->private_data)
 
 static void* fbjq_init(struct fuse_conn_info* conn, struct fuse_config* cfg)
 {
@@ -55,7 +55,7 @@ static int fbjq_getattr(const char* path, struct stat* stbuf, struct fuse_file_i
 		return -ENOENT;
 	}
 
-	fbjqlib::queue_item q_item;
+	fbjqlib::queue_item_t q_item;
 	if (! fbjqlib::get_queue_item(app_cfg, path + 1, &q_item)) {
 		return -ENOENT;
 	}
@@ -113,7 +113,7 @@ static int fbjq_open(const char *path, struct fuse_file_info *fi)
 
 	const struct fuse_context* fuse_ctx = fuse_get_context();
 
-	fbjqlib::queue_item q_item;
+	fbjqlib::queue_item_t q_item;
 
 	if (! fbjqlib::get_queue_item(APP_CTX()->app_cfg, path + 1, &q_item)) {
 		return -ENOENT;
@@ -135,7 +135,7 @@ static int fbjq_open(const char *path, struct fuse_file_info *fi)
 		return -errno;
 	}
 
-	const fbjqlib::request_file_header header{
+	const fbjqlib::request_header_t header{
 		.magic				= { 'F', 'B', 'J', 'Q', },
 		.caller_uid			= static_cast<uint32_t>(fuse_ctx->uid),
 		.caller_gid			= static_cast<uint32_t>(fuse_ctx->gid),
@@ -170,7 +170,7 @@ static int fbjq_write(const char* path, const char* buf, size_t size, off_t offs
 		return -EBADF;
 	}
 
-	ssize_t written = TEMP_FAILURE_RETRY(::pwrite(fd, buf, size, offset + sizeof(fbjqlib::request_file_header)));
+	ssize_t written = TEMP_FAILURE_RETRY(::pwrite(fd, buf, size, offset + sizeof(fbjqlib::request_header_t)));
 	if (written == -1) {
 		return -errno;
 	}

@@ -5,27 +5,15 @@
 #include <filesystem>
 #include <iostream>
 #include <unistd.h>
+#include <fuse3/fuse_opt.h>
 
 struct FuseArgsHelper
 {
-	struct fuse_args args = FUSE_ARGS_INIT(0, nullptr);
-
-	FuseArgsHelper(const char* progname, const std::filesystem::path& mountpoint)
+	struct fuse_args args;
+	
+	FuseArgsHelper(int argc, char** argv)
 	{
-		fuse_opt_add_arg(&args, progname);
-        fuse_opt_add_arg(&args, "-f");
-#if defined(DEBUG)
-        fuse_opt_add_arg(&args, "-d");
-#endif
-        fuse_opt_add_arg(&args, "-o");
-        fuse_opt_add_arg(&args, "allow_other");
-        fuse_opt_add_arg(&args, "-o");
-        fuse_opt_add_arg(&args, "default_permissions");
-        fuse_opt_add_arg(&args, "-o");
-        fuse_opt_add_arg(&args, "fsname=fbjq-fs");
-        fuse_opt_add_arg(&args, "-o");
-        fuse_opt_add_arg(&args, "auto_unmount");
-        fuse_opt_add_arg(&args, mountpoint.c_str());
+		args = FUSE_ARGS_INIT(argc, argv);
 	}
 
 	~FuseArgsHelper()
@@ -99,14 +87,44 @@ struct SystemdUnitHelper
 	}
 };
 
-static int mount_filesystem(const char* progname, const char* cfg_file, bool check_only)
+struct app_args_t
+{
+    int check_only = 0;
+    const char* cfg_file = nullptr;
+};
+
+#define APP_OPT(t, p, v) { t, offsetof(struct app_args_t, p), v }
+
+static const struct fuse_opt app_opts[] =
+{
+    APP_OPT("-C",          check_only, 1),
+    APP_OPT("--check",     check_only, 1),
+    APP_OPT("-c %s",       cfg_file,   0),
+    APP_OPT("--config=%s", cfg_file,   0),
+    FUSE_OPT_END
+};
+
+int main(int argc, char** argv)
 {
 	namespace fs = std::filesystem;
+	(void) argc;
+
+	::umask(0);
+
+	FuseArgsHelper fuseArgs_{ argc, argv };
+	struct fuse_args& args = fuseArgs_.args;
+
+	app_args_t app_args;
+
+	// 第4引数 (proc) に NULL を渡すことで、完全に offsetof による自動代入モードにする
+    if (::fuse_opt_parse(&args, &app_args, app_opts, nullptr) == -1) {
+        return EXIT_FAILURE;
+    }
 
 	// 設定ファイルの読み込み
-	auto appConfigPtr{ fbjqlib::load_config(cfg_file) };
+	auto appConfigPtr{ fbjqlib::load_config(app_args.cfg_file) };
 	if (appConfigPtr) {
-		if (check_only) {
+		if (app_args.check_only) {
 			std::cerr << "Config OK";
 			return EXIT_SUCCESS;
 		}
@@ -116,17 +134,11 @@ static int mount_filesystem(const char* progname, const char* cfg_file, bool che
 	}
 
 	const auto* app_cfg{ appConfigPtr.get() };
-	fs::path mountpoint{ app_cfg->lookup("mountpoint").c_str() };
 	fs::path spool_dir{ app_cfg->lookup("spool_dir").c_str() };
 
-	// FUSE の引数を生成
-	FuseArgsHelper fuseArgs{ progname, mountpoint };
-	const auto& args = fuseArgs.args;
-
 	// FUSE コンテキストの作成
-	struct fbjqlib::context_type app_ctx {
+	struct fbjqlib::app_context_t app_ctx {
 		.app_cfg = app_cfg,
-		//.mountpoint = mountpoint,
 		.spool_dir = spool_dir,
 		.boot_time = std::time(nullptr),
 	};
@@ -140,35 +152,3 @@ static int mount_filesystem(const char* progname, const char* cfg_file, bool che
 	// FUSE メインループの開始
 	return ::fuse_main(args.argc, args.argv, fbjq_operations(), &app_ctx);
 }
-
-int main(int argc, char** argv)
-{
-	int opt;
-	const char* cfg_file = fbjqlib::DEFAULT_CONFIG_FILE;
-	bool check_only = false;
-
-	while ((opt = ::getopt(argc, argv, "Cc:")) != -1) {
-        switch (opt) {
-			case 'C':
-				check_only = true;
-				break;
-            case 'c':
-                cfg_file = optarg;
-                break;
-
-            default:
-                // 不明なオプション、または引数が不足している場合
-                fprintf(stderr, "使用方法: %s [-c cfg_file]\n", argv[0]);
-                return EXIT_FAILURE;
-        }
-    }
-
-    // optind をリセットして、後続のコードで再度 getopt を使用できるようにする
-	optind = 0;
-
-	::umask(0);
-
-	return mount_filesystem(argv[0], cfg_file, check_only);
-}
-
-
