@@ -15,56 +15,55 @@ namespace fbjqlib {
 // ナノ秒精度のモノトニックタイムスタンプ
 uint64_t now_nanos()
 {
+    ENTER_FUNCTION();
+
     const auto now = std::chrono::steady_clock::now();
     return std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
 }
 
-std::filesystem::path get_path_from_fd(int fd)
+bool get_path_from_fd(int fd, char* buf, size_t buf_siz)
 {
-    std::string proc_path = "/proc/self/fd/" + std::to_string(fd);
-    std::error_code ec;
-    
-    std::filesystem::path target = std::filesystem::read_symlink(proc_path, ec);
-    if (ec) {
-        return "";
+    ENTER_FUNCTION();
+
+    if (buf == nullptr || buf_siz == 0) {
+        LOG_ERROR("invalid params");
+        return false;
     }
 
-    return target;
+    char proc_path[PATH_MAX];
+    std::snprintf(proc_path, sizeof(proc_path), "/proc/self/fd/%d", fd);
+
+    const auto len = ::readlink(proc_path, buf, buf_siz - 1);
+    if (len == -1) {
+        LOG_ERROR("{}: readlink", proc_path);
+        return false;
+    }
+
+    buf[len] = '\0';
+
+    return true;
 }
 
 // ユーザー名から UID を取得する関数 (成功時: true, 失敗時: false)
 bool get_uid_by_name(const char* user_name, uid_t* out_uid)
 {
+    ENTER_FUNCTION();
+
     struct passwd pwd;
     struct passwd* result = nullptr;
 
-    // システムの推奨バッファサイズを取得
-    long sys_buflen = ::sysconf(_SC_GETPW_R_SIZE_MAX);
-    if (sys_buflen <= 0) {
-        sys_buflen = 1024;
-    }
-
-    const size_t buflen = static_cast<size_t>(sys_buflen);
-
-    constexpr size_t kMaxStackSize = 4096;
-    
-    // 警告の原因となる assert 内の文字列結合 (&& "...") をやめて単純比較にする
-    assert(buflen <= kMaxStackSize);
-
-    if (buflen > kMaxStackSize) {
-        return false;
-    }
-
-    char* buf_ptr = static_cast<char*>(::alloca(buflen));
-
-    int res = ::getpwnam_r(user_name, &pwd, buf_ptr, buflen, &result);
+    char buf[1024];
+    int res = ::getpwnam_r(user_name, &pwd, buf, sizeof(buf), &result);
 
     if (res == 0 && result != nullptr) {
         if (out_uid) {
             *out_uid = result->pw_uid;
         }
+
         return true;
     }
+
+    LOG_ERROR("getpwnam_r");
 
     return false;
 }
@@ -72,29 +71,13 @@ bool get_uid_by_name(const char* user_name, uid_t* out_uid)
 // グループ名から GID を取得する関数 (成功時: true, 失敗時: false)
 bool get_gid_by_name(const char* group_name, gid_t* out_gid)
 {
+    ENTER_FUNCTION();
+
     struct group grp;
     struct group* result = nullptr;
 
-    // システムの推奨バッファサイズを取得
-    long sys_buflen = ::sysconf(_SC_GETGR_R_SIZE_MAX);
-    if (sys_buflen <= 0) {
-        sys_buflen = 1024;
-    }
-
-    const size_t buflen = static_cast<size_t>(sys_buflen);
-
-    constexpr size_t kMaxStackSize = 4096;
-    
-    // 警告の原因となる assert 内の文字列結合 (&& "...") をやめて単純比較にする
-    assert(buflen <= kMaxStackSize);
-
-    if (buflen > kMaxStackSize) {
-        return false;
-    }
-
-    char* buf_ptr = static_cast<char*>(::alloca(buflen));
-
-    int res = ::getgrnam_r(group_name, &grp, buf_ptr, buflen, &result);
+    char buf[1024];
+    int res = ::getgrnam_r(group_name, &grp, buf, sizeof(buf), &result);
 
     if (res == 0 && result != nullptr) {
         if (out_gid) {
@@ -104,11 +87,15 @@ bool get_gid_by_name(const char* group_name, gid_t* out_gid)
         return true;
     }
 
+    LOG_ERROR("getgrnam_r");
+
     return false;
 }
 
 static bool is_root_directory(const std::filesystem::path& path)
 {
+    ENTER_FUNCTION();
+
     if (path.empty()) {
         return false;
     }
@@ -122,49 +109,51 @@ static bool is_root_directory(const std::filesystem::path& path)
 
 std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
 {
+    ENTER_FUNCTION();
+
     // 設定ファイルの読み込み
-	auto appConfigPtr{ std::make_unique<libconfig::Config>() };
+    auto appConfigPtr{ std::make_unique<libconfig::Config>() };
     auto* app_cfg{ appConfigPtr.get() };
 
-	try {
-		app_cfg->readFile(cfg_file);
+    try {
+        app_cfg->readFile(cfg_file);
 
-	} catch (const libconfig::FileIOException &fioex) {
-		std::cerr << "設定ファイルの読み込みエラー: " << cfg_file << std::endl;
-		return nullptr;
-	} catch (const libconfig::ParseException &pex) {
-		std::cerr << "設定ファイルの解析エラー: " << cfg_file
-				  << " 行: " << pex.getLine()
-				  << " エラー: " << pex.getError() << std::endl;
-		return nullptr;
-	} catch (const std::exception& ex) {
-        std::cerr << "error: " << ex.what() << std::endl;
+    }/* catch (const libconfig::FileIOException &fioex) {
+        std::cerr << "設定ファイルの読み込みエラー: " << cfg_file << std::endl;
+        return nullptr;
+    } catch (const libconfig::ParseException &pex) {
+        std::cerr << "設定ファイルの解析エラー: " << cfg_file
+                  << " 行: " << pex.getLine()
+                  << " エラー: " << pex.getError() << std::endl;
+        return nullptr;
+    }*/ catch (const std::exception& ex) {
+        LOG_ERROR("exception what={}", ex.what());
         return nullptr;
     } catch (...) {
-        std::cerr << "unknown error" << std::endl;
+        LOG_ERROR("unknown");
         return nullptr;
     }
 
     std::string path_str;
     if (! app_cfg->lookupValue("spool_dir", path_str)) {
-        std::cerr << "設定ファイルに 'spool_dir' が見つかりません。" << std::endl;
+        LOG_ERROR("spool_dir: not exists");
         return nullptr;
     }
 
     std::filesystem::path spool_dir{ path_str };
 
     if (spool_dir.empty()) {
-        std::cerr << "設定ファイルの '" << spool_dir << "' が空です。" << std::endl;
-        return nullptr;
-    }
-
-    if (is_root_directory(spool_dir)) {
-        std::cerr << "設定ファイルの '" << spool_dir << "' がルートディレクトリです。" << std::endl;
+        LOG_ERROR("spool_dir: empty");
         return nullptr;
     }
 
     if (! std::filesystem::is_directory(spool_dir)) {
-        std::cerr << "`" << spool_dir << "': not directory" << std::endl;
+        LOG_ERROR("{}: not directory", spool_dir.c_str());
+        return nullptr;
+    }
+
+    if (is_root_directory(spool_dir)) {
+        LOG_ERROR("spool_dir: root directory");
         return nullptr;
     }
 
@@ -172,8 +161,10 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
     const char** subdir = subdirs;
 
     for (; *subdir; ++subdir) {
-        if (! std::filesystem::exists(spool_dir / *subdir)) {
-            std::cerr << (spool_dir / *subdir) << ": not found" << std::endl;
+        const auto path{ spool_dir / *subdir };
+
+        if (! std::filesystem::is_directory(path)) {
+            LOG_ERROR("{}: not directory", path.c_str());
             return nullptr;
         }
     }
@@ -186,22 +177,26 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
     };
 
     if (for_each_queue_item(app_cfg, noop) <= 0) {
-        std::cerr << "有効な queue アイテムが見つかりません。" << std::endl;
+        LOG_ERROR("no queue item");
         return nullptr;
     }
 
-	return appConfigPtr;
+    return appConfigPtr;
 }
 
-static bool get_queue_item_internal(const libconfig::Setting &q_item, queue_item_t* out)
+static bool get_queue_item_internal(const libconfig::Setting &q_item, queue_item_view_t* out)
 {
+    ENTER_FUNCTION();
+
     const char* exec_user = nullptr;
     if (! q_item.lookupValue("exec_user", exec_user)) {
+        LOG_DEBUG("exec_user: no key");
         return false;
     }
 
     const char* allow_group = nullptr;
     if (! q_item.lookupValue("allow_group", allow_group)) {
+        LOG_DEBUG("allow_group: no key");
         return false;
     }
 
@@ -219,11 +214,13 @@ static bool get_queue_item_internal(const libconfig::Setting &q_item, queue_item
 
     uid_t exec_user_uid;
     if (! fbjqlib::get_uid_by_name(exec_user, &exec_user_uid)) {
+        LOG_ERROR("get_uid_by_name");
         return false;
     }
 
     gid_t allow_group_gid;
     if (! fbjqlib::get_gid_by_name(allow_group, &allow_group_gid)) {
+        LOG_ERROR("get_gid_by_name");
         return false;
     }
 
@@ -236,76 +233,99 @@ static bool get_queue_item_internal(const libconfig::Setting &q_item, queue_item
     return true;
 }
 
-bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_item_t* out)
+bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_item_view_t* out)
 {
+    ENTER_FUNCTION();
+
+    const auto q_name_len = std::strlen(q_name);
+    if (q_name_len <= 0 || q_name_len > QUEUE_NAME_MAXLEN) {
+        LOG_ERROR("{}: invalid q_name length", q_name);
+        return false;
+    }
+
     if (! app_cfg->exists("queue")) {
+        LOG_ERROR("queue: no key");
         return false;
     }
 
     const auto& queue = app_cfg->lookup("queue");
     if (! queue.isGroup()) {
+        LOG_ERROR("queue: not group");
         return false;
     }
 
     if (! queue.exists(q_name)) {
+        LOG_ERROR("{}: no key", q_name);
         return false;
     }
 
      if (! get_queue_item_internal(queue[q_name], out)) {
+        LOG_ERROR("get_queue_item_internal");
         return false;
     }
 
     return true;
 }
 
-int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(const char*, const queue_item_t&)> callback)
+int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(const char*, const queue_item_view_t&)> callback)
 {
-    int item_count = -1;
+    ENTER_FUNCTION();
 
-	if (app_cfg->exists("queue")) {
-		const auto& queue = app_cfg->lookup("queue");
+    if (! app_cfg->exists("queue")) {
+        LOG_ERROR("queue: no key");
+        return -1;
+    }
 
-        if (queue.isGroup()) {
-            item_count = 0; // 初期化
+    const auto& queue = app_cfg->lookup("queue");
+    if (! queue.isGroup()) {
+        LOG_ERROR("queue: not group");
+        return -1;
+    }
 
-            const int q_len = queue.getLength();
+    int item_count = 0;
+    const int q_len = queue.getLength();
 
-            for (int i = 0; i < q_len; ++i) {
-                const char* q_name = queue[i].getName();
+    for (int i = 0; i < q_len; ++i) {
+        const char* q_name = queue[i].getName();
+        const auto q_name_len = std::strlen(q_name);
 
-                const auto q_name_len = std::strlen(q_name);
-                if (q_name_len <= 0 || q_name_len > QUEUE_NAME_MAXLEN) {
-                    std::cerr << q_name << ": invalid name length" << std::endl;
-                    continue;
-                }
-
-                queue_item_t q_item;
-                if (! get_queue_item_internal(queue[i], &q_item)) {
-                    std::cerr << q_name << ": invalid name" << std::endl;
-                    continue;
-                }
-
-                if (! callback(q_name, q_item)) {
-                    // コールバックが false を返した場合、処理を中断して -1 を返す
-                    return -1;
-                }
-
-                item_count++; // 有効なアイテムが見つかった場合にカウントを増やす
-            }
+        if (q_name_len <= 0 || q_name_len > QUEUE_NAME_MAXLEN) {
+            LOG_ERROR("{}: invalid q_name length", q_name);
+            continue;
         }
-	}
 
-	return item_count;
+        queue_item_view_t q_item;
+        if (! get_queue_item_internal(queue[i], &q_item)) {
+            LOG_ERROR("get_queue_item_internal");
+            continue;
+        }
+
+        if (! callback(q_name, q_item)) {
+            LOG_ERROR("callback");
+
+            // コールバックが false を返した場合、処理を中断して -1 を返す
+            return -1;
+        }
+
+        item_count++; // 有効なアイテムが見つかった場合にカウントを増やす
+    }
+
+    LOG_DEBUG("item_count={}", item_count);
+
+    return item_count;
 }
 
 bool call_systemd_unit_method(const std::string& unit_name, const std::string& method)
 {
+    ENTER_FUNCTION();
+    
     try {
         auto proxy = sdbus::createProxy(
             sdbus::createSystemBusConnection(),
             sdbus::ServiceName{"org.freedesktop.systemd1"},
             sdbus::ObjectPath{"/org/freedesktop/systemd1"},
-            sdbus::dont_run_event_loop_thread);
+            sdbus::dont_run_event_loop_thread
+        );
 
         sdbus::ObjectPath job;
 
@@ -314,18 +334,19 @@ bool call_systemd_unit_method(const std::string& unit_name, const std::string& m
             .withArguments(unit_name, "replace")
             .storeResultsTo(job);
 
-        std::cout << job << '\n';
+        LOG_INFO("unit={} method={} job={}", unit_name, method, job.c_str());
 
         return true;
     }
+    /*
     catch (const sdbus::Error& e) {
         std::cerr << "sbus error: " << e.what() << std::endl;
         return false;
-	} catch (const std::exception& ex) {
-        std::cerr << "error: " << ex.what() << std::endl;
+    }*/ catch (const std::exception& ex) {
+        LOG_ERROR("exception what={}", ex.what());
         return false;
     } catch (...) {
-        std::cerr << "unknown error" << std::endl;
+        LOG_ERROR("exception unknown");
         return false;
     }
 }

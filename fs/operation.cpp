@@ -2,12 +2,15 @@
 #include "local.hpp"
 #include <iostream>
 #include <cstring>
+#include <libgen.h>
 #include <sys/syscall.h>
 
 #define APP_CTX() static_cast<fbjqlib::app_context_t*>(fuse_get_context()->private_data)
 
 static void* fbjq_init(struct fuse_conn_info* conn, struct fuse_config* cfg)
 {
+    ENTER_FUNCTION();
+
 #ifdef FUSE_CAP_PASSTHROUGH
     // カーネル側が Passthrough に対応していれば有効化を要求
     if (conn->capable & FUSE_CAP_PASSTHROUGH) {
@@ -16,232 +19,263 @@ static void* fbjq_init(struct fuse_conn_info* conn, struct fuse_config* cfg)
 #endif
 
 #if defined(FUSE_CONN_FLAG_SINGLE_ISSUER)
-	/* Always replies inline on the io-uring worker thread */
-	fuse_set_conn_flag(conn, FUSE_CONN_FLAG_SINGLE_ISSUER);
+    /* Always replies inline on the io-uring worker thread */
+    fuse_set_conn_flag(conn, FUSE_CONN_FLAG_SINGLE_ISSUER);
 #endif
 
-	cfg->kernel_cache = 0;
+    cfg->kernel_cache = 0;
 
-	/* Test setting flags the old way */
-	//fuse_set_feature_flag(conn, FUSE_CAP_ASYNC_READ);
-	//fuse_unset_feature_flag(conn, FUSE_CAP_ASYNC_READ);
+    /* Test setting flags the old way */
+    //fuse_set_feature_flag(conn, FUSE_CAP_ASYNC_READ);
+    //fuse_unset_feature_flag(conn, FUSE_CAP_ASYNC_READ);
 
-	//APP_CTX()->cfg->write(stdout);
+    //APP_CTX()->cfg->write(stdout);
 
-	// Return the context pointer to be used in other callbacks
+    // Return the context pointer to be used in other callbacks
 
-	return APP_CTX();
+    return APP_CTX();
 }
 
 static int fbjq_getattr(const char* path, struct stat* stbuf, struct fuse_file_info* fi)
 {
     (void) fi;
+    ENTER_FUNCTION();
 
-	std::memset(stbuf, 0, sizeof(*stbuf));
+    std::memset(stbuf, 0, sizeof(*stbuf));
 
-	if (std::strcmp(path, "/") == 0) {
-		stbuf->st_mode = S_IFDIR | 0755;
-		stbuf->st_nlink = 2;
-		stbuf->st_atime = APP_CTX()->boot_time;
-		stbuf->st_mtime = APP_CTX()->boot_time;
-		stbuf->st_ctime = APP_CTX()->boot_time;
+    if (std::strcmp(path, "/") == 0) {
+        stbuf->st_mode = S_IFDIR | 0755;
+        stbuf->st_nlink = 2;
+        stbuf->st_atime = APP_CTX()->boot_time;
+        stbuf->st_mtime = APP_CTX()->boot_time;
+        stbuf->st_ctime = APP_CTX()->boot_time;
 
-		return 0;
-	}
+        return 0;
+    }
 
-	auto app_cfg = APP_CTX()->app_cfg;
-	if (! app_cfg->exists("queue")) {
-		return -ENOENT;
-	}
+    auto app_cfg = APP_CTX()->app_cfg;
 
-	const char* q_name = path + 1;
-	fbjqlib::queue_item_t q_item;
+    const char* q_name = path + 1;
+    fbjqlib::queue_item_view_t q_item;
 
-	if (! fbjqlib::get_queue_item(app_cfg, q_name, &q_item)) {
-		return -ENOENT;
-	}
+    if (! fbjqlib::get_queue_item(app_cfg, q_name, &q_item)) {
+        LOG_ERROR("get_queue_item");
+        return -ENOENT;
+    }
 
-	stbuf->st_mode = S_IFREG | 0220;
-	stbuf->st_nlink = 1;
-	stbuf->st_uid = q_item.exec_user_uid;
-	stbuf->st_gid = q_item.allow_group_gid;
-	stbuf->st_atime = APP_CTX()->boot_time;
-	stbuf->st_mtime = APP_CTX()->boot_time;
-	stbuf->st_ctime = APP_CTX()->boot_time;
+    stbuf->st_mode = S_IFREG | 0220;
+    stbuf->st_nlink = 1;
+    stbuf->st_uid = q_item.exec_user_uid;
+    stbuf->st_gid = q_item.allow_group_gid;
+    stbuf->st_atime = APP_CTX()->boot_time;
+    stbuf->st_mtime = APP_CTX()->boot_time;
+    stbuf->st_ctime = APP_CTX()->boot_time;
 
-	return 0;
+    return 0;
 }
 
 static int fbjq_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offset,
-	struct fuse_file_info* fi, enum fuse_readdir_flags flags)
+    struct fuse_file_info* fi, enum fuse_readdir_flags flags)
 {
-	(void) offset;
-	(void) fi;
-	(void) flags;
+    (void) offset;
+    (void) fi;
+    (void) flags;
+    ENTER_FUNCTION();
 
-	if (std::strcmp(path, "/") != 0) {
-		return -ENOENT;
-	}
+    if (std::strcmp(path, "/") != 0) {
+        LOG_ERROR("{}: path != /", path);
+        return -ENOENT;
+    }
 
-	filler(buf, ".",  nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
-	filler(buf, "..", nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
+    filler(buf, ".",  nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
+    filler(buf, "..", nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
 
-	const auto append_queue = [buf, filler](const char* q_name, const auto& q_item) -> bool {
-		(void) q_item;
-		
-		filler(buf, q_name, nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
-		return true;
-	};
+    const auto append_queue = [buf, filler](const char* q_name, const auto& q_item) -> bool {
+        (void) q_item;
+        
+        filler(buf, q_name, nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
+        return true;
+    };
 
-	fbjqlib::for_each_queue_item(APP_CTX()->app_cfg, append_queue);
+    fbjqlib::for_each_queue_item(APP_CTX()->app_cfg, append_queue);
 
-	return 0;
+    return 0;
 }
 
 static int fbjq_open(const char *path, struct fuse_file_info *fi)
 {
-	const int acc_mode = fi->flags & O_ACCMODE;
+    ENTER_FUNCTION();
 
-	if (acc_mode == O_WRONLY || acc_mode == O_RDWR) {
-		// go next
-	} else {
-		return -EPERM;
-	}
+    const int acc_mode = fi->flags & O_ACCMODE;
 
-	if (fi->flags & O_EXCL) {
-		return -EPERM;
-	}
+    if (acc_mode == O_WRONLY || acc_mode == O_RDWR) {
+        // go next
+    } else {
+        LOG_ERROR("{}: illegal acc_mode", acc_mode);
+        return -EPERM;
+    }
 
-	const struct fuse_context* fuse_ctx = fuse_get_context();
+    if (fi->flags & O_EXCL) {
+        LOG_ERROR("{}: illegal fi->flags", fi->flags);
+        return -EPERM;
+    }
 
-	const char* q_name = path + 1;
-	fbjqlib::queue_item_t q_item;
+    const struct fuse_context* fuse_ctx = fuse_get_context();
 
-	if (! fbjqlib::get_queue_item(APP_CTX()->app_cfg, q_name, &q_item)) {
-		return -ENOENT;
-	}
+    const char* q_name = path + 1;
+    fbjqlib::queue_item_view_t q_item;
 
-	const auto now = fbjqlib::now_nanos();
-	const auto pid = ::getpid();
-	const auto tid = (pid_t)::syscall(SYS_gettid);
-	const auto filename = std::to_string(now) + "-" + std::to_string(fuse_ctx->pid) + "-" + std::to_string(pid) + "-" + std::to_string(tid) + ".dat";
+    if (! fbjqlib::get_queue_item(APP_CTX()->app_cfg, q_name, &q_item)) {
+        LOG_ERROR("get_queue_item");
+        return -ENOENT;
+    }
 
-	const auto outpath{ APP_CTX()->spool_dir / "tmp" / filename };
+    const uint64_t now = fbjqlib::now_nanos();
+    const pid_t pid = ::getpid();
+    const pid_t tid = (pid_t)::syscall(SYS_gettid);
 
-	fbjqlib::request_header_t header
-	{
-		.magic				= { 'F', 'B', 'J', 'Q', },
-		.caller_uid			= static_cast<uint32_t>(fuse_ctx->uid),
-		.caller_gid			= static_cast<uint32_t>(fuse_ctx->gid),
-		.caller_pid			= static_cast<int32_t>(fuse_ctx->pid),
-		.fuse_pid			= static_cast<int32_t>(pid),
-		.fuse_tid			= static_cast<int32_t>(tid),
-		.exec_user_uid		= static_cast<uint32_t>(q_item.exec_user_uid),
-		.allow_group_gid	= static_cast<uint32_t>(q_item.allow_group_gid),
-		.queue_name			= { '\0' },
-		.filler				= { '\0' },
-		.cigam				= { 'Q', 'J', 'B', 'F' },
-	};
+    char outpath[PATH_MAX];
+    std::snprintf(outpath, sizeof(outpath), "%s/tmp/%lu-%d-%d-%d.dat", APP_CTX()->spool_dir.c_str(), now, fuse_ctx->pid, pid, tid);
 
-	::strncpy(header.queue_name, q_name, sizeof(header.queue_name));
+    fbjqlib::request_header_t header
+    {
+        .magic                = { 'F', 'B', 'J', 'Q', },
+        .caller_uid            = static_cast<uint32_t>(fuse_ctx->uid),
+        .caller_gid            = static_cast<uint32_t>(fuse_ctx->gid),
+        .caller_pid            = static_cast<int32_t>(fuse_ctx->pid),
+        .fuse_pid            = static_cast<int32_t>(pid),
+        .fuse_tid            = static_cast<int32_t>(tid),
+        .exec_user_uid        = static_cast<uint32_t>(q_item.exec_user_uid),
+        .allow_group_gid    = static_cast<uint32_t>(q_item.allow_group_gid),
+        .queue_name            = { '\0' },
+        .padding1            = { '\0' },
+        .cigam                = { 'Q', 'J', 'B', 'F' },
+    };
 
-	// write header
-	const int fh = ::open(outpath.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0400);
-	if (fh == -1) {
-		return -errno;
-	}
+    ::strncpy(header.queue_name, q_name, sizeof(header.queue_name));
 
-	int rc = 0;
-	ssize_t written = -1;
+    // write header
+    int rc = 0;
+    ssize_t written = -1;
 
-	if (::fchown(fh, q_item.exec_user_uid, fbjqlib::DEFAULT_FILE_GROUP) != 0) {
-		rc = -errno;
-		goto EXIT_LABEL;
-	}
+    int fh = ::open(outpath, O_WRONLY | O_CREAT | O_EXCL, 0400);
+    if (fh == -1) {
+        rc = -errno;
+        LOG_ERROR("{}: open", outpath);
+        goto EXIT_LABEL;
+    }
+    
+    if (::fchown(fh, q_item.exec_user_uid, fbjqlib::DEFAULT_FILE_GROUP) != 0) {
+        rc = -errno;
+        LOG_ERROR("chown");
+        goto EXIT_LABEL;
+    }
 
-	written = TEMP_FAILURE_RETRY(::write(fh, &header, sizeof(header)));
-	if (written == -1) {
-		rc = -errno;
-		goto EXIT_LABEL;
-	}
+    written = TEMP_FAILURE_RETRY(::write(fh, &header, sizeof(header)));
+    if (written == -1) {
+        rc = -errno;
+        LOG_ERROR("write");
+        goto EXIT_LABEL;
+    }
 
-	if (written != sizeof(header)) {
-		rc = -EIO;
-		goto EXIT_LABEL;
-	}
+    if (written != sizeof(header)) {
+        rc = -EIO;
+        LOG_ERROR("written={} <> size={}", written, sizeof(header));
+        goto EXIT_LABEL;
+    }
 
-	fi->fh = fh;
-	rc = 0;
+    fi->fh = fh;
+    fh = -1;
+    rc = 0;
 
 EXIT_LABEL:
-	if (rc != 0) {
-		::close(fh);
-	}
+    if (fh != -1) {
+        ::close(fh);
+    }
 
-	return rc;
+    return rc;
 }
 
 static int fbjq_write(const char* path, const char* buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-	(void) path;
+    (void) path;
+    ENTER_FUNCTION();
 
-	const int fd = static_cast<int>(fi->fh);
-	if (fd < 0) {
-		return -EBADF;
-	}
+    const int fd = static_cast<int>(fi->fh);
+    if (fd < 0) {
+        LOG_ERROR("{}: illegal fd", fd);
+        return -EBADF;
+    }
 
-	ssize_t written = TEMP_FAILURE_RETRY(::pwrite(fd, buf, size, offset + sizeof(fbjqlib::request_header_t)));
-	if (written == -1) {
-		return -errno;
-	}
+    ssize_t written = TEMP_FAILURE_RETRY(::pwrite(fd, buf, size, offset + sizeof(fbjqlib::request_header_t)));
+    if (written == -1) {
+        LOG_ERROR("pwrite");
+        return -errno;
+    }
 
-	return static_cast<int>(written);
+    return static_cast<int>(written);
 }
 
 static int fbjq_release(const char* path, struct fuse_file_info* fi)
 {
-	(void) path;
+    (void) path;
+    ENTER_FUNCTION();
 
-	const int fd = static_cast<int>(fi->fh);
-	if (fd < 0) {
-		return -EBADF;
-	}
+    const int fd = static_cast<int>(fi->fh);
+    if (fd < 0) {
+        LOG_ERROR("{}: illegal fd", fd);
+        return -EBADF;
+    }
 
-	const auto oldpath{ fbjqlib::get_path_from_fd(fd) };
+    char oldpath[PATH_MAX];
+    char newpath[PATH_MAX];
+    int rc = 0;
 
-	if (::close(fd) == -1) {
-		return -errno;
-	}
+    if (! fbjqlib::get_path_from_fd(fd, oldpath, sizeof(oldpath))) {
+        rc = -EBADF;
+        LOG_ERROR("get_path_from_fd");
+        goto EXIT_LABEL;
+    }
 
-	if (oldpath.empty()) {
-		return -ENOENT;
-	}
+    {
+        char copy_oldpath[PATH_MAX];
+        std::strcpy(copy_oldpath, oldpath);
 
-	const auto newpath{ APP_CTX()->spool_dir / "delivery" / oldpath.filename() };
+        const char* oldfile = ::basename(copy_oldpath);
+        std::snprintf(newpath, sizeof(newpath), "%s/delivery/%s", APP_CTX()->spool_dir.c_str(), oldfile);
+    }
 
-	if (::rename(oldpath.c_str(), newpath.c_str()) == -1) {
-		return -errno;
-	}
+    if (::rename(oldpath, newpath) == -1) {
+        rc = -errno;
+        LOG_ERROR("rename to={}", newpath);
+        goto EXIT_LABEL;
+    }
 
-	std::cout << "move from=" << oldpath << " to=" << newpath << std::endl;
+    LOG_INFO("regist path={}", newpath);
 
-	return 0;
+EXIT_LABEL:
+    if (::close(fd) == -1) {
+        LOG_ERROR("close");
+    }
+
+    return rc;
 }
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 static const struct fuse_operations fbjq_oper =
 {
-	.getattr	= fbjq_getattr,
-	.open		= fbjq_open,
-	.write		= fbjq_write,
-	.release	= fbjq_release,
-	.readdir	= fbjq_readdir,
-	.init       = fbjq_init,
+    .getattr    = fbjq_getattr,
+    .open        = fbjq_open,
+    .write        = fbjq_write,
+    .release    = fbjq_release,
+    .readdir    = fbjq_readdir,
+    .init       = fbjq_init,
 };
 #pragma GCC diagnostic pop
 
 const struct fuse_operations* fbjq_operations()
 {
+    ENTER_FUNCTION();
     return &fbjq_oper;
 }
