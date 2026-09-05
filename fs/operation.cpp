@@ -1,5 +1,5 @@
 // fs/operation.cpp
-#include "local.hpp"
+#include "fs-local.hpp"
 #include <cstdint>
 #include <cinttypes>
 #include <atomic>
@@ -8,7 +8,7 @@
 #include <libgen.h>
 #include <sys/syscall.h>
 
-#define APP_CTX() static_cast<fbjqlib::app_context_t*>(fuse_get_context()->private_data)
+#define APP_CTX() static_cast<app_context_t*>(fuse_get_context()->private_data)
 
 static void* fbjq_init(struct fuse_conn_info* conn, struct fuse_config* cfg)
 {
@@ -191,7 +191,6 @@ static int fbjq_open(const char *path, struct fuse_file_info *fi)
 
     fi->fh = fh;
     fh = -1;
-    rc = 0;
 
 EXIT_LABEL:
     if (fh != -1) {
@@ -232,9 +231,9 @@ static int fbjq_release(const char* path, struct fuse_file_info* fi)
         return -EBADF;
     }
 
+    int rc = 0;
     char oldpath[PATH_MAX];
     char newpath[PATH_MAX];
-    int rc = 0;
 
     if (! fbjqlib::get_path_from_fd(fd, oldpath, sizeof(oldpath))) {
         rc = -EBADF;
@@ -268,11 +267,10 @@ EXIT_LABEL:
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-static const struct fuse_operations fbjq_oper =
-{
+static const struct fuse_operations fbjq_oper = {
     .getattr    = fbjq_getattr,
-    .open        = fbjq_open,
-    .write        = fbjq_write,
+    .open       = fbjq_open,
+    .write      = fbjq_write,
     .release    = fbjq_release,
     .readdir    = fbjq_readdir,
     .init       = fbjq_init,

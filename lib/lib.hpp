@@ -3,6 +3,7 @@
 
 #include <cerrno>
 #include <cstdint>
+#include <cstddef>
 #include <iostream>
 #include <filesystem>
 #include <format>
@@ -10,7 +11,7 @@
 #include <memory>
 #include <source_location>
 #include <string>
-#include <sys/types.h>
+//#include <sys/types.h>
 #include <libconfig.h++>
 #include <grp.h>
 #include <pwd.h>
@@ -22,7 +23,8 @@ inline constexpr gid_t DEFAULT_FILE_GROUP = static_cast<gid_t>(0);
 inline constexpr int QUEUE_MAX_PROCESS = 32;
 inline constexpr int QUEUE_NAME_MAXLEN = 31;
 
-struct queue_item_view_t {
+struct queue_item_view_t
+{
     // exec_user / allow_group は Setting の内部バッファを指す生ポインタ。
     // 取得元の Config が生きている短いスコープでのみ使用すること。
     const char* exec_user{ nullptr };
@@ -32,7 +34,6 @@ struct queue_item_view_t {
     int max_process{ 1 };
 };
 
-// util.cpp で定義される関数の宣言
 std::int64_t now_nanos();
 bool get_path_from_fd(int fd, char* buf, size_t buf_siz);
 bool get_uid_by_name(const char* user_name, uid_t* out_uid);
@@ -44,26 +45,20 @@ int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(con
 
 bool call_systemd_unit_method(const std::string& unit_name, const std::string& method);
 
-// handler.cpp で定義される関数の宣言
-struct app_context_t {
-    const libconfig::Config* app_cfg{ nullptr };
-    const std::filesystem::path& spool_dir;
-    const time_t boot_time{ static_cast<time_t>(-1) };
-};
-
-struct request_header_t {
+struct request_header_t
+{
     char magic[4];
     char version[4];
-    uint32_t client_uid;
-    uint32_t client_gid;
-    int32_t client_pid;
-    int32_t fuse_pid;
-    int32_t fuse_tid;
-    uint32_t exec_user_uid;
-    uint32_t allow_group_gid;
-    unsigned char padding1[4];
+    std::uint32_t client_uid;
+    std::uint32_t client_gid;
+    std::int32_t client_pid;
+    std::int32_t fuse_pid;
+    std::int32_t fuse_tid;
+    std::uint32_t exec_user_uid;
+    std::uint32_t allow_group_gid;
+    char padding1[4];
     char queue_name[QUEUE_NAME_MAXLEN + 1];
-    unsigned char padding2[52];
+    char padding2[52];
     char cigam[4];
 };
 
@@ -89,7 +84,7 @@ void log_impl(const char* level, std::ostream& os, const std::source_location& l
         auto result = std::format_to_n(buf, sizeof(buf),
             "{}: {}({}): {}: e={}: ", level, loc.file_name(),loc.line(),loc.function_name(), restore_errno__.save_errno_);
 
-        const auto prefix_size = static_cast<std::size_t>(result.out - buf);
+        const auto prefix_size = static_cast<size_t>(result.out - buf);
 
         if (prefix_size >= sizeof(buf)) {
             os.write(buf, sizeof(buf));
@@ -100,7 +95,7 @@ void log_impl(const char* level, std::ostream& os, const std::source_location& l
         result = std::format_to_n(buf + prefix_size,
             sizeof(buf) - prefix_size, fmt, std::forward<Args>(args)...);
 
-        const auto total_size = static_cast<std::size_t>(result.out - buf);
+        const auto total_size = static_cast<size_t>(result.out - buf);
 
         os.write(buf, total_size);
         os.put('\n');
@@ -124,7 +119,8 @@ void log_impl(const char* level, std::ostream& os, const std::source_location& l
 
 #define ENTER_FUNCTION() fbjqlib::restore_errno_t_ restore_errno__; LOG_DEBUG("ENTER")
 
-inline pid_t gettid() {
+inline pid_t gettid()
+{
     return static_cast<pid_t>(::syscall(SYS_gettid));
 }
 

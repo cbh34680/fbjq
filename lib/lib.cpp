@@ -155,7 +155,7 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
     }
 
     if (! std::filesystem::is_directory(spool_dir)) {
-        LOG_ERROR("{}: not directory", spool_dir.c_str());
+        LOG_ERROR("{}: not directory", spool_dir.string());
         return nullptr;
     }
 
@@ -171,7 +171,7 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
         const auto path{ spool_dir / *subdir };
 
         if (! std::filesystem::is_directory(path)) {
-            LOG_ERROR("{}: not directory", path.c_str());
+            LOG_ERROR("{}: not directory", path.string());
             return nullptr;
         }
     }
@@ -231,11 +231,13 @@ static bool get_queue_item_internal(const libconfig::Setting &q_item, queue_item
         return false;
     }
 
-    out->exec_user= exec_user;
-    out->allow_group = allow_group;
-    out->exec_user_uid = exec_user_uid;
-    out->allow_group_gid = allow_group_gid;
-    out->max_process = max_process;
+    if (out) {
+        out->exec_user= exec_user;
+        out->allow_group = allow_group;
+        out->exec_user_uid = exec_user_uid;
+        out->allow_group_gid = allow_group_gid;
+        out->max_process = max_process;
+    }
 
     return true;
 }

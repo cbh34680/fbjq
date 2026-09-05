@@ -1,8 +1,9 @@
 // fs/main.cpp
-#include "local.hpp"
+#include "fs-local.hpp"
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <fuse3/fuse_opt.h>
 
@@ -47,7 +48,7 @@ struct SystemdUnitHelper
                     // go next
 
                 } else {
-                    LOG_ERROR("{}: exists, but not directory", subdir.c_str());
+                    LOG_ERROR("{}: exists, but not directory", subdir.string());
                     return false;
                 }
             } else {
@@ -55,7 +56,7 @@ struct SystemdUnitHelper
                 fs::create_directory(subdir, ec);
 
                 if (ec) {
-                    LOG_ERROR("{}: create: message={}", subdir.c_str(), ec.message());
+                    LOG_ERROR("{}: create: message={}", subdir.string(), ec.message());
                     return false;
                 }
             }
@@ -110,8 +111,7 @@ struct app_args_t
 
 #define APP_OPT(t, p, v) { t, offsetof(struct app_args_t, p), v }
 
-static const struct fuse_opt app_opts[] =
-{
+static const struct fuse_opt app_opts[] = {
     APP_OPT("-C",          check_only, 1),
     APP_OPT("--check",     check_only, 1),
     APP_OPT("-c %s",       cfg_file,   0),
@@ -142,8 +142,6 @@ int main(int argc, char** argv)
         app_args.cfg_file = fbjqlib::DEFAULT_CONFIG_FILE;
     }
 
-    LOG_INFO("load_config config={}", app_args.cfg_file);
-
     // 設定ファイルの読み込み
     auto appConfigPtr{ fbjqlib::load_config(app_args.cfg_file) };
     if (appConfigPtr) {
@@ -156,13 +154,14 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    const auto* app_cfg{ appConfigPtr.get() };
-    fs::path spool_dir{ app_cfg->lookup("spool_dir").c_str() };
+    LOG_INFO("load_config config={}", app_args.cfg_file);
 
-    LOG_DEBUG("spool_dir={}", spool_dir.c_str());
+    const auto* app_cfg = appConfigPtr.get();
+    const fs::path spool_dir{ app_cfg->lookup("spool_dir").c_str() };
+    LOG_DEBUG("spool_dir={}", spool_dir.string());
 
     // FUSE コンテキストの作成
-    struct fbjqlib::app_context_t app_ctx {
+    struct app_context_t app_ctx = {
         .app_cfg = app_cfg,
         .spool_dir = spool_dir,
         .boot_time = std::time(nullptr),

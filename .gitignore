@@ -1,6 +1,7 @@
 /.github/
 /build/
 /a/
+/var-*
 
 /*.sh
 /vsc.code-workspace
