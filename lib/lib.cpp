@@ -11,8 +11,9 @@
 #include <unistd.h>
 #include <sdbus-c++/sdbus-c++.h>
 #include <unistd.h>
-#include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/syscall.h>
+#include <sys/types.h>
 
 namespace fbjqlib {
 
@@ -117,6 +118,29 @@ static bool is_root_directory(const std::filesystem::path& path)
 std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
 {
     ENTER_FUNCTION();
+
+    struct stat st;
+
+    if (::stat(cfg_file, &st) == -1) {
+        LOG_ERROR("{}: stat", cfg_file);
+        return nullptr;
+    }
+
+    if (st.st_uid == 0 && st.st_gid == 0) {
+        if (! S_ISREG(st.st_mode)) {
+            LOG_ERROR("{}: invalid type", cfg_file);
+            return nullptr;
+        }
+
+        if ((st.st_mode & 0777) != 0600) {
+            LOG_ERROR("{}: bad permission", cfg_file);
+            return nullptr;
+        }
+
+    } else {
+        LOG_ERROR("{}: bad owner or group", cfg_file);
+        return nullptr;
+    }
 
     // 設定ファイルの読み込み
     auto appConfigPtr{ std::make_unique<libconfig::Config>() };
