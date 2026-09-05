@@ -197,13 +197,13 @@ static bool get_queue_item_internal(const libconfig::Setting &q_item, queue_item
 
     const char* exec_user = nullptr;
     if (! q_item.lookupValue("exec_user", exec_user)) {
-        LOG_DEBUG("exec_user: no key");
+        LOG_ERROR("exec_user: no key");
         return false;
     }
 
     const char* allow_group = nullptr;
     if (! q_item.lookupValue("allow_group", allow_group)) {
-        LOG_DEBUG("allow_group: no key");
+        LOG_ERROR("allow_group: no key");
         return false;
     }
 
@@ -299,18 +299,18 @@ int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(con
         const auto q_name_len = std::strlen(q_name);
 
         if (q_name_len <= 0 || q_name_len > QUEUE_NAME_MAXLEN) {
-            LOG_ERROR("{}: invalid q_name length", q_name);
-            continue;
+            LOG_ERROR("queue[{}]: {}: invalid q_name length", i, q_name);
+            return -1;
         }
 
         queue_item_view_t q_item;
         if (! get_queue_item_internal(queue[i], &q_item)) {
-            LOG_ERROR("get_queue_item_internal");
-            continue;
+            LOG_ERROR("queue[{}]: {}: get_queue_item_internal", i, q_name);
+            return -1;
         }
 
         if (! callback(q_name, q_item)) {
-            LOG_ERROR("callback");
+            LOG_ERROR("queue[{}]: {}: callback", i, q_name);
 
             // コールバックが false を返した場合、処理を中断して -1 を返す
             return -1;
@@ -320,7 +320,6 @@ int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(con
     }
 
     LOG_DEBUG("item_count={}", item_count);
-
     return item_count;
 }
 

@@ -57,7 +57,7 @@ struct request_header_t
     std::uint32_t exec_user_uid;
     std::uint32_t allow_group_gid;
     char padding1[4];
-    char queue_name[QUEUE_NAME_MAXLEN + 1];
+    char q_name[QUEUE_NAME_MAXLEN + 1];
     char padding2[52];
     char cigam[4];
 };
@@ -82,7 +82,7 @@ void log_impl(const char* level, std::ostream& os, const std::source_location& l
         char buf[512];
 
         auto result = std::format_to_n(buf, sizeof(buf),
-            "{}: {}({}): {}: e={}: ", level, loc.file_name(),loc.line(),loc.function_name(), restore_errno__.save_errno_);
+            "{}: {}({}): {}: errno={}: ", level, loc.file_name(),loc.line(),loc.function_name(), restore_errno__.save_errno_);
 
         const auto prefix_size = static_cast<size_t>(result.out - buf);
 

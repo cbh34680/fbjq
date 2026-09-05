@@ -7,4 +7,3 @@ DirectoryNotEmpty=/var/fbjq/delivery
 
 [Install]
 WantedBy=multi-user.target
-

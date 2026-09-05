@@ -160,7 +160,7 @@ static int for_each_delivery_file(const libconfig::Config* app_cfg)
                     throw std::runtime_error("invalid magic");
                 }
 
-                if (! fbjqlib::get_queue_item(app_cfg, header.queue_name, nullptr)) {
+                if (! fbjqlib::get_queue_item(app_cfg, header.q_name, nullptr)) {
                     throw std::runtime_error("get_queue_item");
                 }
 
@@ -177,7 +177,7 @@ static int for_each_delivery_file(const libconfig::Config* app_cfg)
             }
 
             const fs::path newpath = success
-                ? spool_dir / "queue" / header.queue_name / entry_path.filename()
+                ? spool_dir / "queue" / header.q_name / entry_path.filename()
                 : dead_dir / entry_path.filename();
 
             LOG_INFO("move: from={} to={}", entry_path.string(), newpath.string());

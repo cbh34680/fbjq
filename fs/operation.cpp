@@ -152,12 +152,12 @@ static int fbjq_open(const char *path, struct fuse_file_info *fi)
         .exec_user_uid      = static_cast<uint32_t>(q_item.exec_user_uid),
         .allow_group_gid    = static_cast<uint32_t>(q_item.allow_group_gid),
         .padding1           = { '\0' },
-        .queue_name         = { '\0' },
+        .q_name             = { '\0' },
         .padding2           = { '\0' },
         .cigam              = { 'Q', 'J', 'B', 'F' },
     };
 
-    ::strncpy(header.queue_name, q_name, sizeof(header.queue_name));
+    ::strncpy(header.q_name, q_name, sizeof(header.q_name));
 
     // write header
     int rc = 0;

@@ -6,4 +6,3 @@ Description=FBJQ delivery Worker for Queue /var/fbjq/delivery
 Type=oneshot
 ExecStart=/root/work/fbjq/build/debug/delivery/fbjq-delivery
 Slice=system.slice
-
