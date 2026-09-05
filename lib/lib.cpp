@@ -1,6 +1,7 @@
 // lib/lib.cpp
 #include "lib.hpp"
 #include <cassert>
+#include <ctime>
 #include <algorithm>
 #include <chrono>
 #include <exception>
@@ -9,16 +10,22 @@
 #include <alloca.h>
 #include <unistd.h>
 #include <sdbus-c++/sdbus-c++.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
 
 namespace fbjqlib {
 
 // ナノ秒精度のモノトニックタイムスタンプ
-uint64_t now_nanos()
+std::int64_t now_nanos()
 {
     ENTER_FUNCTION();
 
-    const auto now = std::chrono::steady_clock::now();
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+    struct std::timespec ts;
+    ::clock_gettime(CLOCK_REALTIME, &ts);
+
+    // ナノ秒（Epochからの通算ナノ秒）
+    return static_cast<std::int64_t>(ts.tv_sec) * std::int64_t{ 1000000000 } + ts.tv_nsec;
 }
 
 bool get_path_from_fd(int fd, char* buf, size_t buf_siz)

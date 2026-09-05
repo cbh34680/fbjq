@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cerrno>
+#include <cstdint>
 #include <iostream>
 #include <filesystem>
 #include <format>
@@ -32,7 +33,7 @@ struct queue_item_view_t {
 };
 
 // util.cpp で定義される関数の宣言
-uint64_t now_nanos();
+std::int64_t now_nanos();
 bool get_path_from_fd(int fd, char* buf, size_t buf_siz);
 bool get_uid_by_name(const char* user_name, uid_t* out_uid);
 bool get_gid_by_name(const char* group_name, gid_t* out_gid);
@@ -52,19 +53,21 @@ struct app_context_t {
 
 struct request_header_t {
     char magic[4];
-    uint32_t caller_uid;
-    uint32_t caller_gid;
-    int32_t caller_pid;
+    char version[4];
+    uint32_t client_uid;
+    uint32_t client_gid;
+    int32_t client_pid;
     int32_t fuse_pid;
     int32_t fuse_tid;
     uint32_t exec_user_uid;
     uint32_t allow_group_gid;
+    unsigned char padding1[4];
     char queue_name[QUEUE_NAME_MAXLEN + 1];
-    unsigned char padding1[28];
+    unsigned char padding2[52];
     char cigam[4];
 };
 
-static_assert(sizeof(request_header_t) == 96, "Header size must be 96 bytes");
+static_assert(sizeof(request_header_t) == 128, "Header size must be 128 bytes");
 static_assert(std::is_trivially_copyable_v<request_header_t>, "Header must be trivial");
 
 struct [[nodiscard]] restore_errno_t_
@@ -120,3 +123,8 @@ void log_impl(const char* level, std::ostream& os, const std::source_location& l
 #endif
 
 #define ENTER_FUNCTION() fbjqlib::restore_errno_t_ restore_errno__; LOG_DEBUG("ENTER")
+
+inline pid_t gettid() {
+    return static_cast<pid_t>(::syscall(SYS_gettid));
+}
+

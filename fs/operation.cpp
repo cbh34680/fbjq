@@ -1,5 +1,8 @@
 // fs/operation.cpp
 #include "local.hpp"
+#include <cstdint>
+#include <cinttypes>
+#include <atomic>
 #include <iostream>
 #include <cstring>
 #include <libgen.h>
@@ -130,26 +133,28 @@ static int fbjq_open(const char *path, struct fuse_file_info *fi)
         return -ENOENT;
     }
 
-    const uint64_t now = fbjqlib::now_nanos();
-    const pid_t pid = ::getpid();
-    const pid_t tid = (pid_t)::syscall(SYS_gettid);
+    const auto now = fbjqlib::now_nanos();
+    static std::atomic_uint64_t sequence{ 0 };
+    const auto seq = sequence.fetch_add(1, std::memory_order_relaxed);
 
     char outpath[PATH_MAX];
-    std::snprintf(outpath, sizeof(outpath), "%s/tmp/%lu-%d-%d-%d.dat", APP_CTX()->spool_dir.c_str(), now, fuse_ctx->pid, pid, tid);
+    std::snprintf(outpath, sizeof(outpath), "%s/tmp/%" PRId64 "-%" PRIu64 ".dat", APP_CTX()->spool_dir.c_str(), now, seq);
 
     fbjqlib::request_header_t header
     {
-        .magic                = { 'F', 'B', 'J', 'Q', },
-        .caller_uid            = static_cast<uint32_t>(fuse_ctx->uid),
-        .caller_gid            = static_cast<uint32_t>(fuse_ctx->gid),
-        .caller_pid            = static_cast<int32_t>(fuse_ctx->pid),
-        .fuse_pid            = static_cast<int32_t>(pid),
-        .fuse_tid            = static_cast<int32_t>(tid),
-        .exec_user_uid        = static_cast<uint32_t>(q_item.exec_user_uid),
+        .magic              = { 'F', 'B', 'J', 'Q' },
+        .version            = { '0', '0', '1', '0' },
+        .client_uid         = static_cast<uint32_t>(fuse_ctx->uid),
+        .client_gid         = static_cast<uint32_t>(fuse_ctx->gid),
+        .client_pid         = static_cast<int32_t>(fuse_ctx->pid),
+        .fuse_pid           = static_cast<int32_t>(::getpid()),
+        .fuse_tid           = static_cast<int32_t>(::gettid()),
+        .exec_user_uid      = static_cast<uint32_t>(q_item.exec_user_uid),
         .allow_group_gid    = static_cast<uint32_t>(q_item.allow_group_gid),
-        .queue_name            = { '\0' },
-        .padding1            = { '\0' },
-        .cigam                = { 'Q', 'J', 'B', 'F' },
+        .padding1           = { '\0' },
+        .queue_name         = { '\0' },
+        .padding2           = { '\0' },
+        .cigam              = { 'Q', 'J', 'B', 'F' },
     };
 
     ::strncpy(header.queue_name, q_name, sizeof(header.queue_name));
