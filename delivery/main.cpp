@@ -145,13 +145,13 @@ static int for_each_delivery_file(const libconfig::Config* app_cfg)
                 if (! ifs) {
                     throw std::runtime_error("open error");
                 }
-
                 // open ok
+
                 if (! ifs.read(reinterpret_cast<char*>(&header), sizeof(header))) {
                     throw std::runtime_error("read error");
                 }
-
                 // read header ok
+
                 if (std::string_view(std::begin(header.magic), std::end(header.magic)) != "FBJQ") {
                     throw std::runtime_error("invalid magic");
                 }
@@ -159,12 +159,13 @@ static int for_each_delivery_file(const libconfig::Config* app_cfg)
                 if (std::string_view(std::begin(header.cigam), std::end(header.cigam)) != "QJBF") {
                     throw std::runtime_error("invalid magic");
                 }
+                // check magic ok
 
                 if (! fbjqlib::get_queue_item(app_cfg, header.q_name, nullptr)) {
                     throw std::runtime_error("get_queue_item");
                 }
+                // check queue ok
 
-                // check ok
                 LOG_DEBUG("ok");
 
                 success = true;

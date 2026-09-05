@@ -257,7 +257,7 @@ bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_
         return false;
     }
 
-    const auto& queue = app_cfg->lookup("queue");
+    const auto& queue = app_cfg->getRoot()["queue"];
     if (! queue.isGroup()) {
         LOG_ERROR("queue: not group");
         return false;
@@ -285,7 +285,7 @@ int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(con
         return -1;
     }
 
-    const auto& queue = app_cfg->lookup("queue");
+    const auto& queue = app_cfg->getRoot()["queue"];
     if (! queue.isGroup()) {
         LOG_ERROR("queue: not group");
         return -1;
