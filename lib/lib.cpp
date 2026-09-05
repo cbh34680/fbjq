@@ -152,14 +152,17 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
     }/* catch (const libconfig::FileIOException &fioex) {
         std::cerr << "設定ファイルの読み込みエラー: " << cfg_file << std::endl;
         return nullptr;
+
     } catch (const libconfig::ParseException &pex) {
         std::cerr << "設定ファイルの解析エラー: " << cfg_file
                   << " 行: " << pex.getLine()
                   << " エラー: " << pex.getError() << std::endl;
         return nullptr;
+
     }*/ catch (const std::exception& ex) {
         LOG_ERROR("exception what={}", ex.what());
         return nullptr;
+
     } catch (...) {
         LOG_ERROR("unknown");
         return nullptr;
@@ -374,9 +377,11 @@ bool call_systemd_unit_method(const std::string& unit_name, const std::string& m
     catch (const sdbus::Error& e) {
         std::cerr << "sbus error: " << e.what() << std::endl;
         return false;
+
     }*/ catch (const std::exception& ex) {
         LOG_ERROR("exception what={}", ex.what());
         return false;
+        
     } catch (...) {
         LOG_ERROR("exception unknown");
         return false;
