@@ -1,5 +1,7 @@
 // executor/main.cpp
 #include "fbjq-util.hpp"
+#include <csignal>
+#include <getopt.h>
 
 /*
 [fbjq-executor プログラム仕様]
@@ -23,9 +25,19 @@
 6) プログラム終了
 */
 
-int main()
+static int main_(int argc, char** argv)
 {
     ENTER_FUNCTION();
 
     return 0;
+}
+
+int main(int argc, char** argv)
+{
+    ENTER_FUNCTION();
+
+    const int rc = main_(argc, argv);
+    LOG_INFO("program return-code={}", rc);
+
+    return rc;
 }

@@ -1,119 +1,9 @@
 // fs/main.cpp
 #include "fs-local.hpp"
 
-struct FuseArgsHelper
-{
-    struct fuse_args args;
-    
-    FuseArgsHelper(int argc, char** argv)
-    {
-        ENTER_FUNCTION();
-        args = FUSE_ARGS_INIT(argc, argv);
-    }
-
-    ~FuseArgsHelper()
-    {
-        ENTER_FUNCTION();
-        fuse_opt_free_args(&args);
-    }
-};
-
-struct SystemdUnitHelper
-{
-    bool success = false;
-    const libconfig::Config* app_cfg;
-
-    SystemdUnitHelper(const libconfig::Config* app_cfg_, const std::filesystem::path& spool_dir)
-        : app_cfg{ app_cfg_ }
-    {
-        namespace fs = std::filesystem;
-        ENTER_FUNCTION();
-
-        // .path ユニットの起動関数
-        const auto start_unit = [&spool_dir](const char* q_name, const auto& q_item) -> bool {
-            std::string unit_name{ "fbjq-executor@" };
-            unit_name += q_name;
-            unit_name += ".path";
-
-            const auto subdir{ spool_dir / "queue" / q_name};
-
-            if (fs::exists(subdir)) {
-                if (fs::is_directory(subdir)) {
-                    // go next
-
-                } else {
-                    LOG_ERROR("{}: exists, but not directory", subdir.string());
-                    return false;
-                }
-            } else {
-                std::error_code ec;
-                fs::create_directory(subdir, ec);
-
-                if (ec) {
-                    LOG_ERROR("{}: create: message={}", subdir.string(), ec.message());
-                    return false;
-                }
-            }
-
-            if (::chown(subdir.c_str(), q_item.exec_user_uid, fbjqutil::DEFAULT_FILE_GROUP) != 0) {
-                LOG_ERROR("chown");
-                return false;
-            }
-            
-            if (::chmod(subdir.c_str(), 0700) != 0) {
-                LOG_ERROR("chmod");
-                return false;
-            }
-
-            return fbjqutil::systemctl_start_unit(unit_name);
-        };
-
-        // .path ユニットの起動
-        if (fbjqutil::for_each_queue_item(app_cfg, start_unit) <= 0) {
-            LOG_ERROR("for_each_queue_item");
-            return;
-        }
-
-        success = true;
-    }
-
-    ~SystemdUnitHelper()
-    {
-        ENTER_FUNCTION();
-
-        // .path ユニットの停止関数
-        const auto stop_unit = [](const char* q_name, const auto& q_item) -> bool {
-            (void) q_item;
-
-            std::string unit_name{ "fbjq-executor@" };
-            unit_name += q_name;
-            unit_name += ".path";
-
-            return fbjqutil::systemctl_stop_unit(unit_name);
-        };
-
-        // .path ユニットの停止
-        fbjqutil::for_each_queue_item(app_cfg, stop_unit);
-    }
-};
-
-struct app_args_t
-{
-    int check_only{ 0 };
-    const char* cfg_file{ nullptr };
-};
-
 #define APP_OPT(t, p, v) { t, offsetof(struct app_args_t, p), v }
 
-static const struct fuse_opt app_opts[] = {
-    APP_OPT("-C",          check_only, 1),
-    APP_OPT("--check",     check_only, 1),
-    APP_OPT("-c %s",       cfg_file,   0),
-    APP_OPT("--config=%s", cfg_file,   0),
-    FUSE_OPT_END
-};
-
-int main(int argc, char** argv)
+static int main_(int argc, char** argv)
 {
     namespace fs = std::filesystem;
     (void) argc;
@@ -123,8 +13,21 @@ int main(int argc, char** argv)
 
     FuseArgsHelper fuseArgs_{ argc, argv };
     struct fuse_args& args = fuseArgs_.args;
+    
+    struct app_args_t
+    {
+        int check_only{ 0 };
+        const char* cfg_file{ nullptr };
+    }
+    app_args;
 
-    app_args_t app_args;
+    const struct fuse_opt app_opts[] = {
+        APP_OPT("-C",          check_only, 1),
+        APP_OPT("--check",     check_only, 1),
+        APP_OPT("-c %s",       cfg_file,   0),
+        APP_OPT("--config=%s", cfg_file,   0),
+        FUSE_OPT_END
+    };
 
     // 第4引数 (proc) に NULL を渡すことで、完全に offsetof による自動代入モードにする
     if (::fuse_opt_parse(&args, &app_args, app_opts, nullptr) == -1) {
@@ -155,7 +58,7 @@ int main(int argc, char** argv)
     LOG_DEBUG("spool_dir={}", spool_dir.string());
 
     // FUSE コンテキストの作成
-    struct app_context_t app_ctx = {
+    app_context_t app_ctx = {
         .app_cfg = app_cfg,
         .spool_dir = spool_dir,
         .boot_time = std::time(nullptr),
@@ -170,4 +73,14 @@ int main(int argc, char** argv)
 
     // FUSE メインループの開始
     return ::fuse_main(args.argc, args.argv, fbjq_operations(), &app_ctx);
+}
+
+int main(int argc, char** argv)
+{
+    ENTER_FUNCTION();
+
+    const int rc = main_(argc, argv);
+    LOG_INFO("program return-code={}", rc);
+
+    return rc;
 }

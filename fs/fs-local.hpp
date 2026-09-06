@@ -8,6 +8,7 @@
 
 #include "fbjq-util.hpp"
 
+// fs/operation.cpp
 struct app_context_t
 {
     const libconfig::Config* app_cfg{ nullptr };
@@ -16,3 +17,21 @@ struct app_context_t
 };
 
 const struct fuse_operations* fbjq_operations();
+
+// fs/helper.cpp
+struct FuseArgsHelper
+{
+    struct fuse_args args;
+    
+    FuseArgsHelper(int argc, char** argv);
+    ~FuseArgsHelper();
+};
+
+struct SystemdUnitHelper
+{
+    bool success = false;
+    const libconfig::Config* app_cfg;
+
+    SystemdUnitHelper(const libconfig::Config* app_cfg_, const std::filesystem::path& spool_dir);
+    ~SystemdUnitHelper();
+};

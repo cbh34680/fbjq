@@ -2,6 +2,8 @@
 #include "fbjq-util.hpp"
 #include <sdbus-c++/sdbus-c++.h>
 
+#define AUTO_WAIT (1)
+
 namespace fbjqutil {
 
 bool systemd_unit_method(const std::string& unit_name, const char* method)
@@ -18,22 +20,25 @@ bool systemd_unit_method(const std::string& unit_name, const char* method)
             sdbus::dont_run_event_loop_thread
         ) };
 
-        sdbus::ObjectPath my_job;
+        sdbus::ObjectPath this_job;
         bool finished = false;
         std::string result;
 
         // 2. JobRemoved シグナルを受信した際に実行するコールバック関数を定義
         // 引数: (uint32_t id, ObjectPath job, string unit, string result)
-        const auto job_removed_handler = [&](uint32_t, const sdbus::ObjectPath& removed_job,
-            const std::string&, const std::string& job_result)
+        const auto job_removed_handler = [&](uint32_t job_id, const sdbus::ObjectPath& removed_job,
+            const std::string& removed_unit, const std::string& job_result)
         {
-            LOG_DEBUG("removed_job={} job={} job_result={}", removed_job.c_str(), my_job.c_str(), job_result);
+            LOG_DEBUG("job_id={} removed_job={} removed_unit={} job_result={} this_job={}",
+                job_id, removed_job.c_str(), removed_unit, job_result, this_job.c_str());
 
-            if (removed_job == my_job) {
+            if (removed_job == this_job) {
                 result = job_result;
                 finished = true;
 
+#if defined(AUTO_WAIT)
                 proxy->getConnection().leaveEventLoop();
+#endif
             }
         };
 
@@ -43,24 +48,25 @@ bool systemd_unit_method(const std::string& unit_name, const char* method)
             .onInterface("org.freedesktop.systemd1.Manager")
             .call(job_removed_handler);
 
-        // 4. systemd1.Manager の StartUnit メソッドを呼び出し、生成されたジョブのパスを取得
+        // 4. systemd1.Manager の メソッドを呼び出し、生成されたジョブのパスを取得
         proxy->callMethod(method)
             .onInterface("org.freedesktop.systemd1.Manager")
             .withArguments(unit_name, "replace")
-            .storeResultsTo(my_job);
+            .storeResultsTo(this_job);
 
         // 5. 目的の JobRemoved シグナルを受信するまで待機
-#if 1
+#if defined(AUTO_WAIT)
         if (! finished) {
             proxy->getConnection().enterEventLoop();
         }
+
 #else
         while (! finished) {
             proxy->getConnection().processPendingEvent();
         }
 #endif
 
-        LOG_INFO("unit={} method={} my_job={} result={}", unit_name, method, my_job.c_str(), result);
+        LOG_INFO("unit={} method={} this_job={} result={}", unit_name, method, this_job.c_str(), result);
 
         return result == "done";
     }

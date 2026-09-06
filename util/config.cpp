@@ -39,7 +39,7 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
             return nullptr;
         }
 
-        if ((st.st_mode & 0777) != 0600) {
+        if ((st.st_mode & 0777) != 0644) {
             LOG_ERROR("{}: bad permission", cfg_file);
             return nullptr;
         }

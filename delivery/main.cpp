@@ -12,8 +12,7 @@ static void signal_handler(int signum);
 static int for_each_delivery_file(const libconfig::Config* app_cfg);
 static std::atomic<bool> g_graceful_stop{ false };
 
-
-int main(int argc, char** argv)
+static int main_(int argc, char** argv)
 {
     ENTER_FUNCTION();
 
@@ -32,13 +31,12 @@ int main(int argc, char** argv)
     // オプション指定なし（または引数不足）のエラーメッセージを無効化する場合は 0 に設定
     // opterr = 0;
 
-    struct app_args_t
+    struct
     {
         int check_only{ 0 };
         const char* cfg_file{ fbjqutil::DEFAULT_CONFIG_FILE };
-    };
-
-    app_args_t app_args;
+    }
+    app_args;
 
     while ((opt = getopt_long(argc, argv, "Cc:", long_options, &option_index)) != -1) {
         switch (opt)
@@ -75,10 +73,8 @@ int main(int argc, char** argv)
 
     LOG_INFO("load_config config={}", app_args.cfg_file);
 
-    //
-    struct sigaction sa{};
-
     // ハンドラ関数の登録
+    struct sigaction sa{};
     sa.sa_handler = signal_handler;
     
     // シグナル処理中に他のシグナルをブロックするためのマスクをクリア
@@ -100,6 +96,16 @@ int main(int argc, char** argv)
     LOG_INFO("Validated {} files, g_graceful_stop={}", result, static_cast<bool>(g_graceful_stop));
 
     return EXIT_SUCCESS;
+}
+
+int main(int argc, char** argv)
+{
+    ENTER_FUNCTION();
+
+    const int rc = main_(argc, argv);
+    LOG_INFO("program return-code={}", rc);
+
+    return rc;
 }
 
 static void signal_handler(int signum)
