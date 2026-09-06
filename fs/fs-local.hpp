@@ -6,7 +6,7 @@
 #include <fuse3/fuse.h>
 #include <libconfig.h++>
 
-#include "lib.hpp"
+#include "fbjq-util.hpp"
 
 struct app_context_t
 {

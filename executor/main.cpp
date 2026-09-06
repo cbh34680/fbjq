@@ -1,8 +1,5 @@
 // executor/main.cpp
-#include "lib.hpp"
-#include <iostream>
-#include <thread>
-#include <chrono>
+#include "fbjq-util.hpp"
 
 /*
 [fbjq-executor プログラム仕様]

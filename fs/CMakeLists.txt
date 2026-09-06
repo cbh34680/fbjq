@@ -12,8 +12,8 @@ pkg_check_modules(FUSE3 REQUIRED IMPORTED_TARGET fuse3)
 target_link_libraries(fbjq-fs PRIVATE PkgConfig::FUSE3)
 target_compile_definitions(fbjq-fs PRIVATE FUSE_USE_VERSION=31)
 
-# fbjq-lib
-target_link_libraries(fbjq-fs PRIVATE fbjq-lib)
+# fbjq-util
+target_link_libraries(fbjq-fs PRIVATE fbjq-util)
 
 # print
 get_target_property(FBJQ_FS_LIBS fbjq-fs LINK_LIBRARIES)

@@ -8,8 +8,8 @@ target_compile_definitions(fbjq-delivery PRIVATE
     _GNU_SOURCE
 )
 
-# fbjq-lib
-target_link_libraries(fbjq-delivery PRIVATE fbjq-lib)
+# fbjq-util
+target_link_libraries(fbjq-delivery PRIVATE fbjq-util)
 
 # print
 get_target_property(FBJQ_DELIVERY_LIBS fbjq-delivery LINK_LIBRARIES)

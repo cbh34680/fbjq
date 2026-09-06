@@ -1,22 +1,23 @@
-// lib/lib.hpp
+// util/fbjq-util.hpp
 #pragma once
 
 #include <cerrno>
 #include <cstdint>
-#include <cstddef>
-#include <iostream>
 #include <filesystem>
 #include <format>
 #include <functional>
+#include <iostream>
 #include <memory>
+#include <ostream>
 #include <source_location>
 #include <string>
-//#include <sys/types.h>
-#include <libconfig.h++>
+#include <type_traits>
 #include <grp.h>
 #include <pwd.h>
+#include <sys/syscall.h>
+#include <libconfig.h++>
 
-namespace fbjqlib {
+namespace fbjqutil {
 
 inline constexpr const char* DEFAULT_CONFIG_FILE = "/etc/fbjq.conf";
 inline constexpr gid_t DEFAULT_FILE_GROUP = static_cast<gid_t>(0);
@@ -43,7 +44,15 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file);
 bool get_queue_item(const libconfig::Config* app_cfg, const char* name, queue_item_view_t* queue_item);
 int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(const char* q_name, const queue_item_view_t& q_item)> callback);
 
-bool systemd_unit_method(const std::string& unit_name, const std::string& method);
+bool systemd_unit_method(const std::string& unit_name, const char* method);
+
+inline bool systemctl_start_unit(const std::string& unit_name) {
+    return systemd_unit_method(unit_name, "StartUnit");
+}
+
+inline bool systemctl_stop_unit(const std::string& unit_name) {
+    return systemd_unit_method(unit_name, "StopUnit");
+}
 
 struct request_header_t
 {
@@ -76,13 +85,13 @@ template <typename... Args>
 void log_impl(const char* level, std::ostream& os, const std::source_location& loc,
     std::format_string<Args...> fmt, Args&&... args)
 {
-    restore_errno_t_ restore_errno__;
+    restore_errno_t_ restore_errno_1__;
 
     try {
         char buf[512];
 
         auto result = std::format_to_n(buf, sizeof(buf),
-            "{}: {}({}): {}: errno={}: ", level, loc.file_name(),loc.line(),loc.function_name(), restore_errno__.save_errno_);
+            "{}: {}({}): {}: errno={}: ", level, loc.file_name(),loc.line(),loc.function_name(), restore_errno_1__.save_errno_);
 
         const auto prefix_size = static_cast<size_t>(result.out - buf);
 
@@ -105,21 +114,20 @@ void log_impl(const char* level, std::ostream& os, const std::source_location& l
     }
 }
 
-inline pid_t gettid()
-{
+inline pid_t gettid() {
     return static_cast<pid_t>(::syscall(SYS_gettid));
 }
 
-} // namespace fbjqlib
+} // namespace fbjqutil
 
-#define LOG_ERROR(...) fbjqlib::log_impl("ERR", std::cerr, std::source_location::current(), __VA_ARGS__)
+#define LOG_ERROR(...) fbjqutil::log_impl("ERR", std::cerr, std::source_location::current(), __VA_ARGS__)
 
-#define LOG_INFO(...) fbjqlib::log_impl("INF", std::cout, std::source_location::current(), __VA_ARGS__)
+#define LOG_INFO(...) fbjqutil::log_impl("INF", std::cout, std::source_location::current(), __VA_ARGS__)
 
 #if defined(DEBUG)
-#define LOG_DEBUG(...) fbjqlib::log_impl("DBG", std::cerr, std::source_location::current(), __VA_ARGS__)
+#define LOG_DEBUG(...) fbjqutil::log_impl("DBG", std::cerr, std::source_location::current(), __VA_ARGS__)
 #else
 #define LOG_DEBUG(...) do { } while (false)
 #endif
 
-#define ENTER_FUNCTION() fbjqlib::restore_errno_t_ restore_errno__; LOG_DEBUG("ENTER")
+#define ENTER_FUNCTION() fbjqutil::restore_errno_t_ restore_errno_2__; LOG_DEBUG("ENTER")

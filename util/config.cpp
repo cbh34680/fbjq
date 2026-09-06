@@ -1,102 +1,11 @@
-// lib/lib.cpp
-#include "lib.hpp"
-#include <cassert>
-#include <ctime>
-#include <algorithm>
-#include <chrono>
-#include <exception>
-#include <filesystem>
-#include <iostream>
-#include <unistd.h>
+// util/config.cpp
+#include "fbjq-util.hpp"
+#include <cstring>
 #include <sys/stat.h>
-#include <sys/syscall.h>
 #include <sys/types.h>
-#include <sdbus-c++/sdbus-c++.h>
+#include <unistd.h>
 
-namespace fbjqlib {
-
-// ナノ秒精度の Epoch タイムスタンプ
-std::int64_t now_nanos()
-{
-    ENTER_FUNCTION();
-
-    struct std::timespec ts;
-    ::clock_gettime(CLOCK_REALTIME, &ts);
-
-    // ナノ秒（Epochからの通算ナノ秒）
-    return static_cast<std::int64_t>(ts.tv_sec) * std::int64_t{ 1000000000 } + ts.tv_nsec;
-}
-
-bool get_path_from_fd(int fd, char* buf, size_t buf_siz)
-{
-    ENTER_FUNCTION();
-
-    if (buf == nullptr || buf_siz == 0) {
-        LOG_ERROR("invalid params");
-        return false;
-    }
-
-    char proc_path[PATH_MAX];
-    std::snprintf(proc_path, sizeof(proc_path), "/proc/self/fd/%d", fd);
-
-    const auto len = ::readlink(proc_path, buf, buf_siz - 1);
-    if (len == -1) {
-        LOG_ERROR("{}: readlink", proc_path);
-        return false;
-    }
-
-    buf[len] = '\0';
-
-    return true;
-}
-
-// ユーザー名から UID を取得する関数 (成功時: true, 失敗時: false)
-bool get_uid_by_name(const char* user_name, uid_t* out_uid)
-{
-    ENTER_FUNCTION();
-
-    struct passwd pwd;
-    struct passwd* result = nullptr;
-
-    char buf[1024];
-    int res = ::getpwnam_r(user_name, &pwd, buf, sizeof(buf), &result);
-
-    if (res == 0 && result != nullptr) {
-        if (out_uid) {
-            *out_uid = result->pw_uid;
-        }
-
-        return true;
-    }
-
-    LOG_ERROR("getpwnam_r");
-
-    return false;
-}
-
-// グループ名から GID を取得する関数 (成功時: true, 失敗時: false)
-bool get_gid_by_name(const char* group_name, gid_t* out_gid)
-{
-    ENTER_FUNCTION();
-
-    struct group grp;
-    struct group* result = nullptr;
-
-    char buf[1024];
-    int res = ::getgrnam_r(group_name, &grp, buf, sizeof(buf), &result);
-
-    if (res == 0 && result != nullptr) {
-        if (out_gid) {
-            *out_gid = result->gr_gid;
-        }
-
-        return true;
-    }
-
-    LOG_ERROR("getgrnam_r");
-
-    return false;
-}
+namespace fbjqutil {
 
 static bool is_root_directory(const std::filesystem::path& path)
 {
@@ -245,13 +154,13 @@ static bool get_queue_item_internal(const libconfig::Setting &q_item, queue_item
     max_process = std::clamp(max_process, 1, QUEUE_MAX_PROCESS);
 
     uid_t exec_user_uid;
-    if (! fbjqlib::get_uid_by_name(exec_user, &exec_user_uid)) {
+    if (! fbjqutil::get_uid_by_name(exec_user, &exec_user_uid)) {
         LOG_ERROR("get_uid_by_name");
         return false;
     }
 
     gid_t allow_group_gid;
-    if (! fbjqlib::get_gid_by_name(allow_group, &allow_group_gid)) {
+    if (! fbjqutil::get_gid_by_name(allow_group, &allow_group_gid)) {
         LOG_ERROR("get_gid_by_name");
         return false;
     }
@@ -348,42 +257,4 @@ int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(con
     return item_count;
 }
 
-bool systemd_unit_method(const std::string& unit_name, const std::string& method)
-{
-    ENTER_FUNCTION();
-    
-    try {
-        auto proxy{ sdbus::createProxy(
-            sdbus::createSystemBusConnection(),
-            sdbus::ServiceName{"org.freedesktop.systemd1"},
-            sdbus::ObjectPath{"/org/freedesktop/systemd1"},
-            sdbus::dont_run_event_loop_thread
-        ) };
-
-        sdbus::ObjectPath job;
-
-        proxy->callMethod(method)
-            .onInterface("org.freedesktop.systemd1.Manager")
-            .withArguments(unit_name, "replace")
-            .storeResultsTo(job);
-
-        LOG_INFO("unit={} method={} job={}", unit_name, method, job.c_str());
-
-        return true;
-    }
-    /*
-    catch (const sdbus::Error& e) {
-        std::cerr << "sbus error: " << e.what() << std::endl;
-        return false;
-
-    }*/ catch (const std::exception& ex) {
-        LOG_ERROR("exception what={}", ex.what());
-        return false;
-
-    } catch (...) {
-        LOG_ERROR("exception unknown");
-        return false;
-    }
-}
-
-} // namespace
+} // namespace fbjqutil

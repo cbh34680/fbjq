@@ -1,11 +1,5 @@
 // fs/main.cpp
 #include "fs-local.hpp"
-#include <algorithm>
-#include <filesystem>
-#include <iostream>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <fuse3/fuse_opt.h>
 
 struct FuseArgsHelper
 {
@@ -61,7 +55,7 @@ struct SystemdUnitHelper
                 }
             }
 
-            if (::chown(subdir.c_str(), q_item.exec_user_uid, fbjqlib::DEFAULT_FILE_GROUP) != 0) {
+            if (::chown(subdir.c_str(), q_item.exec_user_uid, fbjqutil::DEFAULT_FILE_GROUP) != 0) {
                 LOG_ERROR("chown");
                 return false;
             }
@@ -71,11 +65,11 @@ struct SystemdUnitHelper
                 return false;
             }
 
-            return fbjqlib::systemd_unit_method(unit_name, "StartUnit");
+            return fbjqutil::systemctl_start_unit(unit_name);
         };
 
         // .path ユニットの起動
-        if (fbjqlib::for_each_queue_item(app_cfg, start_unit) <= 0) {
+        if (fbjqutil::for_each_queue_item(app_cfg, start_unit) <= 0) {
             LOG_ERROR("for_each_queue_item");
             return;
         }
@@ -95,11 +89,11 @@ struct SystemdUnitHelper
             unit_name += q_name;
             unit_name += ".path";
 
-            return fbjqlib::systemd_unit_method(unit_name, "StopUnit");
+            return fbjqutil::systemctl_stop_unit(unit_name);
         };
 
         // .path ユニットの停止
-        fbjqlib::for_each_queue_item(app_cfg, stop_unit);
+        fbjqutil::for_each_queue_item(app_cfg, stop_unit);
     }
 };
 
@@ -139,11 +133,11 @@ int main(int argc, char** argv)
     }
 
     if (! app_args.cfg_file) {
-        app_args.cfg_file = fbjqlib::DEFAULT_CONFIG_FILE;
+        app_args.cfg_file = fbjqutil::DEFAULT_CONFIG_FILE;
     }
 
     // 設定ファイルの読み込み
-    auto appConfigPtr{ fbjqlib::load_config(app_args.cfg_file) };
+    auto appConfigPtr{ fbjqutil::load_config(app_args.cfg_file) };
     if (appConfigPtr) {
         if (app_args.check_only) {
             LOG_INFO("config check ok");

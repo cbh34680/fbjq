@@ -1,12 +1,8 @@
 // fs/operation.cpp
 #include "fs-local.hpp"
-#include <cstdint>
 #include <cinttypes>
-#include <atomic>
-#include <iostream>
 #include <cstring>
-#include <libgen.h>
-#include <sys/syscall.h>
+#include <atomic>
 
 #define APP_CTX() static_cast<app_context_t*>(fuse_get_context()->private_data)
 
@@ -59,9 +55,9 @@ static int fbjq_getattr(const char* path, struct stat* stbuf, struct fuse_file_i
     auto app_cfg = APP_CTX()->app_cfg;
 
     const char* q_name = path + 1;
-    fbjqlib::queue_item_view_t q_item;
+    fbjqutil::queue_item_view_t q_item;
 
-    if (! fbjqlib::get_queue_item(app_cfg, q_name, &q_item)) {
+    if (! fbjqutil::get_queue_item(app_cfg, q_name, &q_item)) {
         LOG_ERROR("get_queue_item");
         return -ENOENT;
     }
@@ -100,7 +96,7 @@ static int fbjq_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off
         return true;
     };
 
-    fbjqlib::for_each_queue_item(APP_CTX()->app_cfg, append_queue);
+    fbjqutil::for_each_queue_item(APP_CTX()->app_cfg, append_queue);
 
     return 0;
 }
@@ -126,21 +122,21 @@ static int fbjq_open(const char *path, struct fuse_file_info *fi)
     const struct fuse_context* fuse_ctx = fuse_get_context();
 
     const char* q_name = path + 1;
-    fbjqlib::queue_item_view_t q_item;
+    fbjqutil::queue_item_view_t q_item;
 
-    if (! fbjqlib::get_queue_item(APP_CTX()->app_cfg, q_name, &q_item)) {
+    if (! fbjqutil::get_queue_item(APP_CTX()->app_cfg, q_name, &q_item)) {
         LOG_ERROR("get_queue_item");
         return -ENOENT;
     }
 
-    const auto now = fbjqlib::now_nanos();
+    const auto now = fbjqutil::now_nanos();
     static std::atomic_uint64_t sequence{ 0 };
     const auto seq = sequence.fetch_add(1, std::memory_order_relaxed);
 
     char outpath[PATH_MAX];
     std::snprintf(outpath, sizeof(outpath), "%s/tmp/%" PRId64 "-%" PRIu64 ".dat", APP_CTX()->spool_dir.c_str(), now, seq);
 
-    fbjqlib::request_header_t header
+    fbjqutil::request_header_t header
     {
         .magic              = { 'F', 'B', 'J', 'Q' },
         .version            = { '0', '0', '1', '0' },
@@ -148,7 +144,7 @@ static int fbjq_open(const char *path, struct fuse_file_info *fi)
         .client_gid         = static_cast<uint32_t>(fuse_ctx->gid),
         .client_pid         = static_cast<int32_t>(fuse_ctx->pid),
         .fuse_pid           = static_cast<int32_t>(::getpid()),
-        .fuse_tid           = static_cast<int32_t>(fbjqlib::gettid()),
+        .fuse_tid           = static_cast<int32_t>(fbjqutil::gettid()),
         .exec_user_uid      = static_cast<uint32_t>(q_item.exec_user_uid),
         .allow_group_gid    = static_cast<uint32_t>(q_item.allow_group_gid),
         .padding1           = { '\0' },
@@ -170,7 +166,7 @@ static int fbjq_open(const char *path, struct fuse_file_info *fi)
         goto EXIT_LABEL;
     }
     
-    if (::fchown(fh, q_item.exec_user_uid, fbjqlib::DEFAULT_FILE_GROUP) != 0) {
+    if (::fchown(fh, q_item.exec_user_uid, fbjqutil::DEFAULT_FILE_GROUP) != 0) {
         rc = -errno;
         LOG_ERROR("chown");
         goto EXIT_LABEL;
@@ -211,7 +207,7 @@ static int fbjq_write(const char* path, const char* buf, size_t size, off_t offs
         return -EBADF;
     }
 
-    ssize_t written = TEMP_FAILURE_RETRY(::pwrite(fd, buf, size, offset + sizeof(fbjqlib::request_header_t)));
+    ssize_t written = TEMP_FAILURE_RETRY(::pwrite(fd, buf, size, offset + sizeof(fbjqutil::request_header_t)));
     if (written == -1) {
         LOG_ERROR("pwrite");
         return -errno;
@@ -240,7 +236,7 @@ static int fbjq_release(const char* path, struct fuse_file_info* fi)
     char oldpath[PATH_MAX];
     char newpath[PATH_MAX];
 
-    if (! fbjqlib::get_path_from_fd(fd, oldpath, sizeof(oldpath))) {
+    if (! fbjqutil::get_path_from_fd(fd, oldpath, sizeof(oldpath))) {
         rc = -EBADF;
         LOG_ERROR("get_path_from_fd");
         goto EXIT_LABEL;

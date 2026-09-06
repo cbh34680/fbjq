@@ -1,11 +1,11 @@
 // delivery/main.cpp
-#include "lib.hpp"
+#include "fbjq-util.hpp"
 #include <csignal>
-#include <atomic>
-#include <iostream>
 #include <fstream>
 #include <getopt.h>
+#include <atomic>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 static void signal_handler(int signum);
@@ -35,7 +35,7 @@ int main(int argc, char** argv)
     struct app_args_t
     {
         int check_only{ 0 };
-        const char* cfg_file{ fbjqlib::DEFAULT_CONFIG_FILE };
+        const char* cfg_file{ fbjqutil::DEFAULT_CONFIG_FILE };
     };
 
     app_args_t app_args;
@@ -62,7 +62,7 @@ int main(int argc, char** argv)
     }
 
     // 設定ファイルの読み込み
-    auto appConfigPtr{ fbjqlib::load_config(app_args.cfg_file) };
+    auto appConfigPtr{ fbjqutil::load_config(app_args.cfg_file) };
     if (appConfigPtr) {
         if (app_args.check_only) {
             LOG_INFO("config check ok");
@@ -138,7 +138,7 @@ static int for_each_delivery_file(const libconfig::Config* app_cfg)
             LOG_DEBUG("entry path={}", entry_path.string());
 
             bool success = false;
-            fbjqlib::request_header_t header;
+            fbjqutil::request_header_t header;
 
             try {
                 std::ifstream ifs{ entry_path, std::ios::in | std::ios::binary };
@@ -161,7 +161,7 @@ static int for_each_delivery_file(const libconfig::Config* app_cfg)
                 }
                 // check magic ok
 
-                if (! fbjqlib::get_queue_item(app_cfg, header.q_name, nullptr)) {
+                if (! fbjqutil::get_queue_item(app_cfg, header.q_name, nullptr)) {
                     throw std::runtime_error("get_queue_item");
                 }
                 // check queue ok
