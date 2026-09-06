@@ -1,16 +1,16 @@
-#/etc/systemd/system/fbjq-delivery.service
+#/etc/systemd/system/fbjq-fs.service
 [Unit]
-Description=FBJQ delivery Worker for Queue /var/fbjq/delivery
+Description=FBJQ Filesystem Service
 
 [Service]
-Type=oneshot
+Type=simple
 Slice=system.slice
 RuntimeDirectory=fbjq
 
 # == DEBUG ==
-ExecStart=/root/work/fbjq/build/debug/delivery/fbjq-delivery
+ExecStart=/root/work/fbjq/build/debug/fs/fbjq-fs
 ## == RELEASE ==
-#ExecStart=/usr/local/bin/fbjq-delivery
+#ExecStart=/usr/local/bin/fbjq-fs
 
 # == security ==
 NoNewPrivileges=yes
@@ -28,3 +28,6 @@ MemoryDenyWriteExecute=yes
 RestrictRealtime=yes
 LockPersonality=yes
 RestrictNamespaces=yes
+
+[Install]
+WantedBy=multi-user.target

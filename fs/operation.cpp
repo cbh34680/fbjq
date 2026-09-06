@@ -148,7 +148,7 @@ static int fbjq_open(const char *path, struct fuse_file_info *fi)
         .client_gid         = static_cast<uint32_t>(fuse_ctx->gid),
         .client_pid         = static_cast<int32_t>(fuse_ctx->pid),
         .fuse_pid           = static_cast<int32_t>(::getpid()),
-        .fuse_tid           = static_cast<int32_t>(::gettid()),
+        .fuse_tid           = static_cast<int32_t>(fbjqlib::gettid()),
         .exec_user_uid      = static_cast<uint32_t>(q_item.exec_user_uid),
         .allow_group_gid    = static_cast<uint32_t>(q_item.allow_group_gid),
         .padding1           = { '\0' },
@@ -215,6 +215,11 @@ static int fbjq_write(const char* path, const char* buf, size_t size, off_t offs
     if (written == -1) {
         LOG_ERROR("pwrite");
         return -errno;
+    }
+
+    if (written > INT_MAX) {
+        LOG_ERROR("pwrite returned too large value: {}", written);
+        return -EOVERFLOW;
     }
 
     return static_cast<int>(written);

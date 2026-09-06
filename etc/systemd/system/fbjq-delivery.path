@@ -4,6 +4,8 @@ Description=Watch queue directory /var/fbjq/delivery
 
 [Path]
 DirectoryNotEmpty=/var/fbjq/delivery
+MakeDirectory=yes
+DirectoryMode=0700
 
 [Install]
 WantedBy=multi-user.target

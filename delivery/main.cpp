@@ -10,7 +10,7 @@
 
 static void signal_handler(int signum);
 static int for_each_delivery_file(const libconfig::Config* app_cfg);
-static std::atomic<bool> g_stop{ false };
+static std::atomic<bool> g_graceful_stop{ false };
 
 
 int main(int argc, char** argv)
@@ -97,7 +97,7 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    LOG_INFO("Processed {} files, g_stop={}", result, static_cast<bool>(g_stop));
+    LOG_INFO("Validated {} files, g_graceful_stop={}", result, static_cast<bool>(g_graceful_stop));
 
     return EXIT_SUCCESS;
 }
@@ -105,7 +105,7 @@ int main(int argc, char** argv)
 static void signal_handler(int signum)
 {
     if (signum == SIGTERM || signum == SIGINT) {
-        g_stop = true; // ループを抜けるフラグを立てる
+        g_graceful_stop = true; // ループを抜けるフラグを立てる
     }
 }
 
@@ -123,7 +123,7 @@ static int for_each_delivery_file(const libconfig::Config* app_cfg)
         int i = 0;
         
         for (const auto& entry : fs::directory_iterator(spool_dir / "delivery")) {
-            if (g_stop) {
+            if (g_graceful_stop) {
                 LOG_INFO("receive signal, graceful stop");
                 break;
             }

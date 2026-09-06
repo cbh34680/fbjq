@@ -7,17 +7,15 @@
 #include <exception>
 #include <filesystem>
 #include <iostream>
-#include <alloca.h>
-#include <unistd.h>
-#include <sdbus-c++/sdbus-c++.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
+#include <sdbus-c++/sdbus-c++.h>
 
 namespace fbjqlib {
 
-// ナノ秒精度のモノトニックタイムスタンプ
+// ナノ秒精度の Epoch タイムスタンプ
 std::int64_t now_nanos()
 {
     ENTER_FUNCTION();
@@ -350,17 +348,17 @@ int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(con
     return item_count;
 }
 
-bool call_systemd_unit_method(const std::string& unit_name, const std::string& method)
+bool systemd_unit_method(const std::string& unit_name, const std::string& method)
 {
     ENTER_FUNCTION();
     
     try {
-        auto proxy = sdbus::createProxy(
+        auto proxy{ sdbus::createProxy(
             sdbus::createSystemBusConnection(),
             sdbus::ServiceName{"org.freedesktop.systemd1"},
             sdbus::ObjectPath{"/org/freedesktop/systemd1"},
             sdbus::dont_run_event_loop_thread
-        );
+        ) };
 
         sdbus::ObjectPath job;
 
@@ -381,7 +379,7 @@ bool call_systemd_unit_method(const std::string& unit_name, const std::string& m
     }*/ catch (const std::exception& ex) {
         LOG_ERROR("exception what={}", ex.what());
         return false;
-        
+
     } catch (...) {
         LOG_ERROR("exception unknown");
         return false;

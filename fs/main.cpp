@@ -71,7 +71,7 @@ struct SystemdUnitHelper
                 return false;
             }
 
-            return fbjqlib::call_systemd_unit_method(unit_name, "StartUnit");
+            return fbjqlib::systemd_unit_method(unit_name, "StartUnit");
         };
 
         // .path ユニットの起動
@@ -95,7 +95,7 @@ struct SystemdUnitHelper
             unit_name += q_name;
             unit_name += ".path";
 
-            return fbjqlib::call_systemd_unit_method(unit_name, "StopUnit");
+            return fbjqlib::systemd_unit_method(unit_name, "StopUnit");
         };
 
         // .path ユニットの停止

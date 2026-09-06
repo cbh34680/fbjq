@@ -43,7 +43,7 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file);
 bool get_queue_item(const libconfig::Config* app_cfg, const char* name, queue_item_view_t* queue_item);
 int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(const char* q_name, const queue_item_view_t& q_item)> callback);
 
-bool call_systemd_unit_method(const std::string& unit_name, const std::string& method);
+bool systemd_unit_method(const std::string& unit_name, const std::string& method);
 
 struct request_header_t
 {
@@ -105,7 +105,12 @@ void log_impl(const char* level, std::ostream& os, const std::source_location& l
     }
 }
 
-} // namespace
+inline pid_t gettid()
+{
+    return static_cast<pid_t>(::syscall(SYS_gettid));
+}
+
+} // namespace fbjqlib
 
 #define LOG_ERROR(...) fbjqlib::log_impl("ERR", std::cerr, std::source_location::current(), __VA_ARGS__)
 
@@ -118,9 +123,3 @@ void log_impl(const char* level, std::ostream& os, const std::source_location& l
 #endif
 
 #define ENTER_FUNCTION() fbjqlib::restore_errno_t_ restore_errno__; LOG_DEBUG("ENTER")
-
-inline pid_t gettid()
-{
-    return static_cast<pid_t>(::syscall(SYS_gettid));
-}
-
