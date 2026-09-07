@@ -1,4 +1,4 @@
-#/lib/systemd/system/system/fbjq-delivery.path
+# /lib/systemd/system/system/fbjq-delivery.path
 [Unit]
 Description=Watch queue directory /var/spool/fbjq/delivery
 

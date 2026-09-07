@@ -1,4 +1,4 @@
-#/lib/systemd/system/system/fbjq-delivery.service
+# /lib/systemd/system/system/fbjq-delivery.service
 [Unit]
 Description=FBJQ delivery Worker for Queue /var/spool/fbjq/delivery
 
