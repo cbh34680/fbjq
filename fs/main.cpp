@@ -1,5 +1,5 @@
 // fs/main.cpp
-#include "fs-local.hpp"
+#include "local.hpp"
 
 #define APP_OPT(t, p, v) { t, offsetof(struct app_args_t, p), v }
 
@@ -10,8 +10,6 @@ int main_(int argc, char** argv)
     namespace fs = std::filesystem;
     (void) argc;
     ENTER_FUNCTION();
-
-    ::umask(0);
 
     FuseArgsHelper fuseArgs_{ argc, argv };
     struct fuse_args& args = fuseArgs_.args;
@@ -90,6 +88,8 @@ int main(int argc, char** argv)
 {
     ENTER_FUNCTION();
 
+    ::umask(0);
+    
     const int rc = main_(argc, argv);
     LOG_INFO("program return-code={}", rc);
 

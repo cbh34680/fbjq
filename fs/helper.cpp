@@ -1,5 +1,5 @@
 // fs/main.cpp
-#include "fs-local.hpp"
+#include "local.hpp"
 
 FuseArgsHelper::FuseArgsHelper(int argc, char** argv)
 {
@@ -20,7 +20,7 @@ SystemdUnitHelper::SystemdUnitHelper(const libconfig::Config* app_cfg_, const st
     ENTER_FUNCTION();
 
     // .path ユニットの起動関数
-    const auto start_unit = [&spool_dir](const char* q_name, const auto& q_item) -> bool {
+    const auto start_unit = [&](const char* q_name, const auto& q_item) -> bool {
         std::string unit_name{ "fbjq-executor@" };
         unit_name += q_name;
         unit_name += ".path";
@@ -49,7 +49,7 @@ SystemdUnitHelper::SystemdUnitHelper(const libconfig::Config* app_cfg_, const st
             LOG_ERROR("chown");
             return false;
         }
-        
+
         if (::chmod(subdir.c_str(), 0700) != 0) {
             LOG_ERROR("chmod");
             return false;
@@ -72,7 +72,7 @@ SystemdUnitHelper::~SystemdUnitHelper()
     ENTER_FUNCTION();
 
     // .path ユニットの停止関数
-    const auto stop_unit = [](const char* q_name, const auto& q_item) -> bool {
+    const auto stop_unit = [&](const char* q_name, const auto& q_item) -> bool {
         (void) q_item;
 
         std::string unit_name{ "fbjq-executor@" };
@@ -85,4 +85,3 @@ SystemdUnitHelper::~SystemdUnitHelper()
     // .path ユニットの停止
     fbjqutil::for_each_queue_item(app_cfg, stop_unit);
 }
-

@@ -1,5 +1,5 @@
 // util/systemd.cpp
-#include "fbjq-util.hpp"
+#include "fbjq-common.hpp"
 #include <sdbus-c++/sdbus-c++.h>
 
 #define AUTO_WAIT (1)
@@ -9,7 +9,7 @@ namespace fbjqutil {
 bool systemd_unit_method(const std::string& unit_name, const char* method)
 {
     ENTER_FUNCTION();
-    
+
     try {
         // 1. システムバスへの接続を作成し、systemdマネージャのD-Busプロキシを生成
         // event_loop_thread は起動せず、手動でイベントを処理する設定にする
@@ -26,7 +26,7 @@ bool systemd_unit_method(const std::string& unit_name, const char* method)
 
         // 2. JobRemoved シグナルを受信した際に実行するコールバック関数を定義
         // 引数: (uint32_t id, ObjectPath job, string unit, string result)
-        const auto job_removed_handler = [&](uint32_t job_id, const sdbus::ObjectPath& removed_job,
+        const auto on_signal = [&](uint32_t job_id, const sdbus::ObjectPath& removed_job,
             const std::string& removed_unit, const std::string& job_result)
         {
             LOG_DEBUG("job_id={} removed_job={} removed_unit={} job_result={} this_job={}",
@@ -46,7 +46,7 @@ bool systemd_unit_method(const std::string& unit_name, const char* method)
         // (StartUnit 実行直後に高速でジョブが完了した場合のシグナル全般を取りこぼさないため)
         proxy->uponSignal("JobRemoved")
             .onInterface("org.freedesktop.systemd1.Manager")
-            .call(job_removed_handler);
+            .call(on_signal);
 
         // 4. systemd1.Manager の メソッドを呼び出し、生成されたジョブのパスを取得
         proxy->callMethod(method)

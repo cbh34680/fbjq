@@ -2,12 +2,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug fbjq-fs",
+            "name": "fs Debug",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/fs/fbjq-fs",
             "args": [
-                "-c" , "${workspaceFolder}/etc/fbjq.conf",
+                "-c", "${workspaceFolder}/deploy/etc/fbjq.conf",
                 "-f",
                 "-d",
                 "-o", "allow_other",
@@ -41,12 +41,13 @@
             "preLaunchTask": "build-fs"
         },
         {
-            "name": "Debug fbjq-delivery",
+            "name": "delivery Debug",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/delivery/fbjq-delivery",
             "args": [
-                "-c" , "${workspaceFolder}/etc/fbjq.conf",
+                "-c", "${workspaceFolder}/deploy/etc/fbjq.conf",
+                "-n", "10",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -73,11 +74,14 @@
             "preLaunchTask": "build-delivery"
         },
         {
-            "name": "Debug fbjq-executor",
+            "name": "executor Debug",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/executor/fbjq-executor",
-            "args": [],
+            "args": [
+                "-c", "${workspaceFolder}/deploy/etc/fbjq.conf",
+                "-q", "alice",
+            ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

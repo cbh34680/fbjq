@@ -1,5 +1,5 @@
 // util/config.cpp
-#include "fbjq-util.hpp"
+#include "fbjq-common.hpp"
 #include <cstring>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -165,7 +165,7 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
         }
     }
 
-    const auto noop = [](const char* q_name, const auto& q_item) {
+    const auto noop = [&](const char* q_name, const auto& q_item) {
         (void) q_name;
         (void) q_item;
 
@@ -214,7 +214,7 @@ bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_
     return true;
 }
 
-int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(const char*, const queue_item_view_t&)> callback)
+int for_each_queue_item(const libconfig::Config* app_cfg, const std::function<bool(const char*, const queue_item_view_t&)>& callback)
 {
     ENTER_FUNCTION();
 

@@ -1,4 +1,4 @@
-// util/fbjq-util.hpp
+// util/fbjq-common.hpp
 #pragma once
 
 #include <cerrno>
@@ -64,10 +64,10 @@ void log_impl(const char* level, std::ostream& os, const std::source_location& l
     }
 }
 
-inline constexpr const char* DEFAULT_CONFIG_FILE = "/etc/fbjq.conf";
-inline constexpr gid_t DEFAULT_FILE_GROUP = static_cast<gid_t>(0);
-inline constexpr int QUEUE_MAX_PROCESS = 32;
-inline constexpr int QUEUE_NAME_MAXLEN = 31;
+constexpr const char* DEFAULT_CONFIG_FILE = "/etc/fbjq.conf";
+constexpr gid_t DEFAULT_FILE_GROUP = static_cast<gid_t>(0);
+constexpr int QUEUE_MAX_PROCESS = 32;
+constexpr int QUEUE_NAME_MAXLEN = 31;
 
 struct queue_item_view_t
 {
@@ -88,8 +88,8 @@ bool get_gid_by_name(const char* group_name, gid_t* out_gid);
 
 // util/config.cpp
 std::unique_ptr<libconfig::Config> load_config(const char* cfg_file);
-bool get_queue_item(const libconfig::Config* app_cfg, const char* name, queue_item_view_t* queue_item);
-int for_each_queue_item(const libconfig::Config* app_cfg, std::function<bool(const char* q_name, const queue_item_view_t& q_item)> callback);
+bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_item_view_t* queue_item);
+int for_each_queue_item(const libconfig::Config* app_cfg, const std::function<bool(const char* q_name, const queue_item_view_t& q_item)>& callback);
 
 // util/systemd.cpp
 bool systemd_unit_method(const std::string& unit_name, const char* method);
@@ -133,5 +133,7 @@ static_assert(std::is_trivially_copyable_v<request_header_t>, "Header must be tr
 #else
 #define LOG_DEBUG(...) do { } while (false)
 #endif
+
+#define NULLABLE_CSTR(x) (x) ? (x) : "(null)"
 
 #define ENTER_FUNCTION() fbjqutil::restore_errno_t_ restore_errno_0__; LOG_DEBUG("ENTER")

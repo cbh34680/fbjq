@@ -1,5 +1,5 @@
 // fs/operation.cpp
-#include "fs-local.hpp"
+#include "local.hpp"
 #include <cinttypes>
 #include <cstring>
 #include <atomic>
@@ -91,9 +91,9 @@ int fbjq_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offs
     filler(buf, ".",  nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
     filler(buf, "..", nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
 
-    const auto append_queue = [buf, filler](const char* q_name, const auto& q_item) -> bool {
+    const auto append_queue = [&](const char* q_name, const auto& q_item) -> bool {
         (void) q_item;
-        
+
         filler(buf, q_name, nullptr, 0, FUSE_FILL_DIR_DEFAULTS);
         return true;
     };
@@ -167,7 +167,7 @@ int fbjq_open(const char *path, struct fuse_file_info *fi)
         LOG_ERROR("{}: open", outpath);
         goto EXIT_LABEL;
     }
-    
+
     if (::fchown(fh, q_item.exec_user_uid, fbjqutil::DEFAULT_FILE_GROUP) != 0) {
         rc = -errno;
         LOG_ERROR("chown");
