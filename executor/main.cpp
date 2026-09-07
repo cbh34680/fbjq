@@ -140,7 +140,7 @@ int main_(int argc, char** argv)
     const auto should_continue = [&](const auto& entry, const int moved) -> bool {
         (void) entry;
 
-        if (moved > app_args.max_files) {
+        if (moved >= app_args.max_files) {
             // .path の停止を検知するために一定数を処理したら .service を終了する
             LOG_INFO("The maximum number of processes has been reached.");
             return false;

@@ -153,7 +153,7 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
         return nullptr;
     }
 
-    const char* subdirs[] = { "tmp", "delivery", "dead", "queue", nullptr };
+    const char* subdirs[] = { "tmp", "delivery", "queue", "archive", "dead", nullptr };
     const char** subdir = subdirs;
 
     for (; *subdir; ++subdir) {

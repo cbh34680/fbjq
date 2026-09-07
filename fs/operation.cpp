@@ -98,7 +98,10 @@ int fbjq_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offs
         return true;
     };
 
-    fbjqutil::for_each_queue_item(APP_CTX()->app_cfg, append_queue);
+    const auto rc = fbjqutil::for_each_queue_item(APP_CTX()->app_cfg, append_queue);
+    if (rc < 0) {
+        return -EIO;
+    }
 
     return 0;
 }
