@@ -1,4 +1,4 @@
-#/executor/CMakeLists.txt
+# executor/CMakeLists.txt
 add_executable(fbjq-executor main.cpp executor.cpp)
 
 target_compile_definitions(fbjq-executor PRIVATE

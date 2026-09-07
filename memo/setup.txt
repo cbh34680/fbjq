@@ -18,21 +18,4 @@ root@guest:~/work/fbjq# apt install libsdbus-c++-dev
 root@guest:~/work/fbjq# cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 root@guest:~/work/fbjq# cmake --build build --verbose
 
-root@guest:~/work/fbjq# systemd-tmpfiles --create etc/tmpfiles.d/fbjq.conf
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+root@guest:~/work/fbjq# systemd-tmpfiles --create deploy/etc/tmpfiles.d/fbjq.conf

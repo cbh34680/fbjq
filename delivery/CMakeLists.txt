@@ -1,5 +1,4 @@
 # delivery/CMakeLists.txt
-
 add_executable(fbjq-delivery main.cpp delivery.cpp)
 
 target_compile_definitions(fbjq-delivery PRIVATE

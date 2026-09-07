@@ -28,12 +28,12 @@
                     "ignoreFailures": true
                 },
                 {
-                    "description": "SIGINT をデバッガで止めずにアプリへ渡す",
+                    "description": "Pass SIGINT directly to the application without stopping in the debugger",
                     "text": "handle SIGINT pass nostop noprint",
                     "ignoreFailures": true
                 },
                 {
-                    "description": "SIGTERMでも停止させずアプリに直接渡す",
+                    "description": "Pass SIGTERM directly to the application without stopping in the debugger",
                     "text": "handle SIGTERM pass nostop noprint",
                     "ignoreFailures": true
                 }
@@ -61,12 +61,12 @@
                     "ignoreFailures": true
                 },
                 {
-                    "description": "SIGINT をデバッガで止めずにアプリへ渡す",
+                    "description": "Pass SIGINT directly to the application without stopping in the debugger",
                     "text": "handle SIGINT pass nostop noprint",
                     "ignoreFailures": true
                 },
                 {
-                    "description": "SIGTERMでも停止させずアプリに直接渡す",
+                    "description": "Pass SIGTERM directly to the application without stopping in the debugger",
                     "text": "handle SIGTERM pass nostop noprint",
                     "ignoreFailures": true
                 }
@@ -94,12 +94,12 @@
                     "ignoreFailures": true
                 },
                 {
-                    "description": "SIGINT をデバッガで止めずにアプリへ渡す",
+                    "description": "Pass SIGINT directly to the application without stopping in the debugger",
                     "text": "handle SIGINT pass nostop noprint",
                     "ignoreFailures": true
                 },
                 {
-                    "description": "SIGTERMでも停止させずアプリに直接渡す",
+                    "description": "Pass SIGTERM directly to the application without stopping in the debugger",
                     "text": "handle SIGTERM pass nostop noprint",
                     "ignoreFailures": true
                 }
