@@ -1,4 +1,4 @@
-// delivery/local.hpp
+// executor/local.hpp
 #pragma once
 #include "fbjq-common.hpp"
 
