@@ -8,11 +8,15 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-static void signal_handler(int signum);
-static int for_each_delivery_file(const libconfig::Config* app_cfg);
-static std::atomic<bool> g_graceful_stop{ false };
+namespace {
 
-static int main_(int argc, char** argv)
+void signal_handler(int signum);
+int for_each_delivery_file(const libconfig::Config* app_cfg, const int max_files);
+
+constexpr int DEFAULT_MAX_FILES = 500;
+std::atomic<bool> g_graceful_stop{ false };
+
+int main_(int argc, char** argv)
 {
     ENTER_FUNCTION();
 
@@ -22,7 +26,7 @@ static int main_(int argc, char** argv)
     int option_index = 0;
 
     // ロングオプションの定義
-    static struct option long_options[] = {
+    const struct option long_options[] = {
         {"check",   no_argument,       nullptr, 'C'},
         {"config",  required_argument, nullptr, 'c'},
         {nullptr,   0,                 nullptr, 0  }
@@ -35,6 +39,11 @@ static int main_(int argc, char** argv)
     {
         int check_only{ 0 };
         const char* cfg_file{ fbjqutil::DEFAULT_CONFIG_FILE };
+        int max_files{ DEFAULT_MAX_FILES };
+
+        std::string string() {
+            return std::format("check_only={}, cfg_file={}, max_files={}", check_only, cfg_file, max_files);
+        }
     }
     app_args;
 
@@ -48,6 +57,10 @@ static int main_(int argc, char** argv)
             case 'c':
                 app_args.cfg_file = optarg;
                 break;
+            
+            case 'n':
+                app_args.max_files = std::clamp(atoi(optarg), 0, 10240);
+                break;
 
             case '?':
                 // 未知のオプション、または引数が不足している場合
@@ -59,6 +72,8 @@ static int main_(int argc, char** argv)
         }
     }
 
+    LOG_INFO("args: {}", app_args.string());
+
     // 設定ファイルの読み込み
     auto appConfigPtr{ fbjqutil::load_config(app_args.cfg_file) };
     if (appConfigPtr) {
@@ -66,12 +81,11 @@ static int main_(int argc, char** argv)
             LOG_INFO("config check ok");
             return EXIT_SUCCESS;
         }
+
     } else {
         LOG_ERROR("load_config");
         return EXIT_FAILURE;
     }
-
-    LOG_INFO("load_config config={}", app_args.cfg_file);
 
     // ハンドラ関数の登録
     struct sigaction sa{};
@@ -87,16 +101,19 @@ static int main_(int argc, char** argv)
     ::sigaction(SIGINT, &sa, nullptr);
 
     //
-    int result = for_each_delivery_file(appConfigPtr.get());
+    int result = for_each_delivery_file(appConfigPtr.get(), app_args.max_files);
     if (result < 0) {
-        LOG_ERROR("for_each_delivery_file");
+        LOG_ERROR("for_each_delivery_file: result={}", result);
         return EXIT_FAILURE;
     }
 
-    LOG_INFO("Validated {} files, g_graceful_stop={}", result, static_cast<bool>(g_graceful_stop));
+    LOG_INFO("Validated {} files, result={}, g_graceful_stop={}",
+        result, result, static_cast<bool>(g_graceful_stop));
 
     return EXIT_SUCCESS;
 }
+
+} //namespace
 
 int main(int argc, char** argv)
 {
@@ -108,14 +125,16 @@ int main(int argc, char** argv)
     return rc;
 }
 
-static void signal_handler(int signum)
+namespace {
+
+void signal_handler(int signum)
 {
     if (signum == SIGTERM || signum == SIGINT) {
         g_graceful_stop = true; // ループを抜けるフラグを立てる
     }
 }
 
-static int for_each_delivery_file(const libconfig::Config* app_cfg)
+int for_each_delivery_file(const libconfig::Config* app_cfg, const int max_files)
 {
     namespace fs = std::filesystem;
     ENTER_FUNCTION();
@@ -129,6 +148,12 @@ static int for_each_delivery_file(const libconfig::Config* app_cfg)
         int i = 0;
         
         for (const auto& entry : fs::directory_iterator(spool_dir / "delivery")) {
+            if (i > max_files) {
+                // .path の停止を検知するために一定数を処理したら .service を終了する
+                LOG_INFO("The maximum number of processes has been reached.");
+                break;
+            }
+
             if (g_graceful_stop) {
                 LOG_INFO("receive signal, graceful stop");
                 break;
@@ -202,3 +227,5 @@ static int for_each_delivery_file(const libconfig::Config* app_cfg)
         return -1;
     }
 }
+
+} // namespace

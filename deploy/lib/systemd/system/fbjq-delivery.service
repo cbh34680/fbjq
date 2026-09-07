@@ -1,6 +1,6 @@
-#/etc/systemd/system/fbjq-delivery.service
+#/lib/systemd/system/system/fbjq-delivery.service
 [Unit]
-Description=FBJQ delivery Worker for Queue /var/fbjq/delivery
+Description=FBJQ delivery Worker for Queue /var/spool/fbjq/delivery
 
 [Service]
 Type=oneshot

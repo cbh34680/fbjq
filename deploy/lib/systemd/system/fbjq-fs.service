@@ -1,4 +1,4 @@
-#/etc/systemd/system/fbjq-fs.service
+#/lib/systemd/system/system/fbjq-fs.service
 [Unit]
 Description=FBJQ Filesystem Service
 

@@ -5,9 +5,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-namespace fbjqutil {
+namespace {
 
-static bool is_root_directory(const std::filesystem::path& path)
+bool is_root_directory(const std::filesystem::path& path)
 {
     ENTER_FUNCTION();
 
@@ -21,6 +21,61 @@ static bool is_root_directory(const std::filesystem::path& path)
     // 親ディレクトリが自分自身と等しい場合はルートディレクトリ
     return norm.parent_path() == norm;
 }
+
+bool get_queue_item_internal(const libconfig::Setting &q_item, fbjqutil::queue_item_view_t* out)
+{
+    ENTER_FUNCTION();
+
+    const char* exec_user = nullptr;
+    if (! q_item.lookupValue("exec_user", exec_user)) {
+        LOG_ERROR("exec_user: no key");
+        return false;
+    }
+
+    const char* allow_group = nullptr;
+    if (! q_item.lookupValue("allow_group", allow_group)) {
+        LOG_ERROR("allow_group: no key");
+        return false;
+    }
+
+    int max_process = 1;
+    q_item.lookupValue("max_process", max_process);
+
+    /*
+    if (max_process <= 0) {
+        max_process = 1;
+    } else if (max_process > QUEUE_MAX_PROCESS) {
+        max_process = 32;
+    }
+    */
+    max_process = std::clamp(max_process, 1, fbjqutil::QUEUE_MAX_PROCESS);
+
+    uid_t exec_user_uid;
+    if (! fbjqutil::get_uid_by_name(exec_user, &exec_user_uid)) {
+        LOG_ERROR("get_uid_by_name");
+        return false;
+    }
+
+    gid_t allow_group_gid;
+    if (! fbjqutil::get_gid_by_name(allow_group, &allow_group_gid)) {
+        LOG_ERROR("get_gid_by_name");
+        return false;
+    }
+
+    if (out) {
+        out->exec_user= exec_user;
+        out->allow_group = allow_group;
+        out->exec_user_uid = exec_user_uid;
+        out->allow_group_gid = allow_group_gid;
+        out->max_process = max_process;
+    }
+
+    return true;
+}
+
+} // namespace
+
+namespace fbjqutil {
 
 std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
 {
@@ -123,57 +178,6 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
     }
 
     return appConfigPtr;
-}
-
-static bool get_queue_item_internal(const libconfig::Setting &q_item, queue_item_view_t* out)
-{
-    ENTER_FUNCTION();
-
-    const char* exec_user = nullptr;
-    if (! q_item.lookupValue("exec_user", exec_user)) {
-        LOG_ERROR("exec_user: no key");
-        return false;
-    }
-
-    const char* allow_group = nullptr;
-    if (! q_item.lookupValue("allow_group", allow_group)) {
-        LOG_ERROR("allow_group: no key");
-        return false;
-    }
-
-    int max_process = 1;
-    q_item.lookupValue("max_process", max_process);
-
-    /*
-    if (max_process <= 0) {
-        max_process = 1;
-    } else if (max_process > QUEUE_MAX_PROCESS) {
-        max_process = 32;
-    }
-    */
-    max_process = std::clamp(max_process, 1, QUEUE_MAX_PROCESS);
-
-    uid_t exec_user_uid;
-    if (! fbjqutil::get_uid_by_name(exec_user, &exec_user_uid)) {
-        LOG_ERROR("get_uid_by_name");
-        return false;
-    }
-
-    gid_t allow_group_gid;
-    if (! fbjqutil::get_gid_by_name(allow_group, &allow_group_gid)) {
-        LOG_ERROR("get_gid_by_name");
-        return false;
-    }
-
-    if (out) {
-        out->exec_user= exec_user;
-        out->allow_group = allow_group;
-        out->exec_user_uid = exec_user_uid;
-        out->allow_group_gid = allow_group_gid;
-        out->max_process = max_process;
-    }
-
-    return true;
 }
 
 bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_item_view_t* out)

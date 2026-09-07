@@ -18,3 +18,14 @@ target_link_libraries(fbjq-fs PRIVATE fbjq-util)
 # print
 get_target_property(FBJQ_FS_LIBS fbjq-fs LINK_LIBRARIES)
 message(STATUS "fbjq-fs link libs = ${FBJQ_FS_LIBS}")
+
+# == INSTALL SECTION ==>>
+install(TARGETS fbjq-fs
+    RUNTIME
+        DESTINATION ${CMAKE_INSTALL_BINDIR}
+        PERMISSIONS
+            OWNER_READ OWNER_WRITE OWNER_EXECUTE
+            GROUP_READ GROUP_EXECUTE
+            WORLD_READ WORLD_EXECUTE
+)
+# == INSTALL SECTION <<==

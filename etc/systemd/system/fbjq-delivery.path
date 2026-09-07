@@ -1,9 +1,0 @@
-#/etc/systemd/system/fbjq-delivery.path
-[Unit]
-Description=Watch queue directory /var/fbjq/delivery
-
-[Path]
-DirectoryNotEmpty=/var/fbjq/delivery
-
-[Install]
-WantedBy=multi-user.target

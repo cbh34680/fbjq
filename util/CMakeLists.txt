@@ -20,3 +20,11 @@ target_link_libraries(fbjq-util PUBLIC SDBusCpp::sdbus-c++)
 # print
 get_target_property(FBJQ_UTIL_LIBS fbjq-util LINK_LIBRARIES)
 message(STATUS "fbjq-util link libs = ${FBJQ_UTIL_LIBS}")
+
+# == INSTALL SECTION ==>>
+install(TARGETS fbjq-util
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} # .a ファイル用 (STATIC)
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} # .so ファイル用 (SHARED)
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} # .dll 用 (Windows環境考慮)
+)
+# == INSTALL SECTION <<==

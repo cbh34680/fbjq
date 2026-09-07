@@ -1,9 +1,0 @@
-# /etc/systemd/system/fbjq-executor@.path
-[Unit]
-Description=Watch queue directory /var/fbjq/queue/%I
-
-[Path]
-DirectoryNotEmpty=/var/fbjq/queue/%I
-
-[Install]
-WantedBy=multi-user.target

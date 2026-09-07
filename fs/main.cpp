@@ -3,7 +3,9 @@
 
 #define APP_OPT(t, p, v) { t, offsetof(struct app_args_t, p), v }
 
-static int main_(int argc, char** argv)
+namespace {
+
+int main_(int argc, char** argv)
 {
     namespace fs = std::filesystem;
     (void) argc;
@@ -18,6 +20,10 @@ static int main_(int argc, char** argv)
     {
         int check_only{ 0 };
         const char* cfg_file{ nullptr };
+
+        std::string string() {
+            return std::format("check_only={}, cfg_file={}", check_only, cfg_file);
+        }
     }
     app_args;
 
@@ -39,6 +45,8 @@ static int main_(int argc, char** argv)
         app_args.cfg_file = fbjqutil::DEFAULT_CONFIG_FILE;
     }
 
+    LOG_INFO("args: {}", app_args.string());
+
     // 設定ファイルの読み込み
     auto appConfigPtr{ fbjqutil::load_config(app_args.cfg_file) };
     if (appConfigPtr) {
@@ -46,6 +54,7 @@ static int main_(int argc, char** argv)
             LOG_INFO("config check ok");
             return EXIT_SUCCESS;
         }
+
     } else {
         LOG_ERROR("load_config");
         return EXIT_FAILURE;
@@ -74,6 +83,8 @@ static int main_(int argc, char** argv)
     // FUSE メインループの開始
     return ::fuse_main(args.argc, args.argv, fbjq_operations(), &app_ctx);
 }
+
+} // namespace
 
 int main(int argc, char** argv)
 {

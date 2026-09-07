@@ -26,6 +26,10 @@ struct [[nodiscard]] restore_errno_t_
     ~restore_errno_t_() { errno = save_errno_; }
 };
 
+inline pid_t getthrid() {
+    return static_cast<pid_t>(::syscall(SYS_gettid));
+}
+
 template <typename... Args>
 void log_impl(const char* level, std::ostream& os, const std::source_location& loc,
     std::format_string<Args...> fmt, Args&&... args)
@@ -33,11 +37,11 @@ void log_impl(const char* level, std::ostream& os, const std::source_location& l
     restore_errno_t_ restore_errno_1__;
 
     try {
-        char buf[512];
+        char buf[1024];
 
         auto result = std::format_to_n(buf, sizeof(buf),
-            "{}: {}({}): {}: errno={}: ", level, loc.file_name(),loc.line(),loc.function_name(),
-            restore_errno_1__.save_errno_);
+            "{}: {}({}): {}: tid={} errno={}: ", level, loc.file_name(),loc.line(),loc.function_name(),
+            getthrid(), restore_errno_1__.save_errno_);
 
         const auto prefix_size = static_cast<size_t>(result.out - buf);
 
@@ -58,10 +62,6 @@ void log_impl(const char* level, std::ostream& os, const std::source_location& l
     catch (...) {
         // ignore
     }
-}
-
-inline pid_t gettid() {
-    return static_cast<pid_t>(::syscall(SYS_gettid));
 }
 
 inline constexpr const char* DEFAULT_CONFIG_FILE = "/etc/fbjq.conf";
@@ -134,4 +134,4 @@ static_assert(std::is_trivially_copyable_v<request_header_t>, "Header must be tr
 #define LOG_DEBUG(...) do { } while (false)
 #endif
 
-#define ENTER_FUNCTION() fbjqutil::restore_errno_t_ restore_errno_2__; LOG_DEBUG("ENTER")
+#define ENTER_FUNCTION() fbjqutil::restore_errno_t_ restore_errno_0__; LOG_DEBUG("ENTER")

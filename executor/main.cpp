@@ -25,12 +25,16 @@
 6) プログラム終了
 */
 
-static int main_(int argc, char** argv)
+namespace {
+
+int main_(int argc, char** argv)
 {
     ENTER_FUNCTION();
 
     return 0;
 }
+
+} // namespace
 
 int main(int argc, char** argv)
 {

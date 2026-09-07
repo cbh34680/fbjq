@@ -6,7 +6,9 @@
 
 #define APP_CTX() static_cast<app_context_t*>(fuse_get_context()->private_data)
 
-static void* fbjq_init(struct fuse_conn_info* conn, struct fuse_config* cfg)
+namespace {
+
+void* fbjq_init(struct fuse_conn_info* conn, struct fuse_config* cfg)
 {
     ENTER_FUNCTION();
 
@@ -35,7 +37,7 @@ static void* fbjq_init(struct fuse_conn_info* conn, struct fuse_config* cfg)
     return APP_CTX();
 }
 
-static int fbjq_getattr(const char* path, struct stat* stbuf, struct fuse_file_info* fi)
+int fbjq_getattr(const char* path, struct stat* stbuf, struct fuse_file_info* fi)
 {
     (void) fi;
     ENTER_FUNCTION();
@@ -73,7 +75,7 @@ static int fbjq_getattr(const char* path, struct stat* stbuf, struct fuse_file_i
     return 0;
 }
 
-static int fbjq_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offset,
+int fbjq_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offset,
     struct fuse_file_info* fi, enum fuse_readdir_flags flags)
 {
     (void) offset;
@@ -101,7 +103,7 @@ static int fbjq_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off
     return 0;
 }
 
-static int fbjq_open(const char *path, struct fuse_file_info *fi)
+int fbjq_open(const char *path, struct fuse_file_info *fi)
 {
     ENTER_FUNCTION();
 
@@ -144,7 +146,7 @@ static int fbjq_open(const char *path, struct fuse_file_info *fi)
         .client_gid         = static_cast<uint32_t>(fuse_ctx->gid),
         .client_pid         = static_cast<int32_t>(fuse_ctx->pid),
         .fuse_pid           = static_cast<int32_t>(::getpid()),
-        .fuse_tid           = static_cast<int32_t>(fbjqutil::gettid()),
+        .fuse_tid           = static_cast<int32_t>(fbjqutil::getthrid()),
         .exec_user_uid      = static_cast<uint32_t>(q_item.exec_user_uid),
         .allow_group_gid    = static_cast<uint32_t>(q_item.allow_group_gid),
         .padding1           = { '\0' },
@@ -196,7 +198,7 @@ EXIT_LABEL:
     return rc;
 }
 
-static int fbjq_write(const char* path, const char* buf, size_t size, off_t offset, struct fuse_file_info *fi)
+int fbjq_write(const char* path, const char* buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     (void) path;
     ENTER_FUNCTION();
@@ -221,7 +223,7 @@ static int fbjq_write(const char* path, const char* buf, size_t size, off_t offs
     return static_cast<int>(written);
 }
 
-static int fbjq_release(const char* path, struct fuse_file_info* fi)
+int fbjq_release(const char* path, struct fuse_file_info* fi)
 {
     (void) path;
     ENTER_FUNCTION();
@@ -268,7 +270,7 @@ EXIT_LABEL:
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-static const struct fuse_operations fbjq_oper = {
+const struct fuse_operations fbjq_oper = {
     .getattr    = fbjq_getattr,
     .open       = fbjq_open,
     .write      = fbjq_write,
@@ -277,6 +279,8 @@ static const struct fuse_operations fbjq_oper = {
     .init       = fbjq_init,
 };
 #pragma GCC diagnostic pop
+
+} // namespace
 
 const struct fuse_operations* fbjq_operations()
 {

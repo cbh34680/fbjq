@@ -1,6 +1,6 @@
-# /etc/systemd/system/fbjq-executor@.service
+# /lib/systemd/system/system/fbjq-executor@.service
 [Unit]
-Description=FBJQ Executor Worker for Queue /var/fbjq/queue/%I
+Description=FBJQ Executor Worker for Queue /var/spool/fbjq/queue/%I
 
 [Service]
 Type=oneshot

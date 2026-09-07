@@ -1,0 +1,9 @@
+# /lib/systemd/system/system/fbjq-executor@.path
+[Unit]
+Description=Watch queue directory /var/spool/fbjq/queue/%I
+
+[Path]
+DirectoryNotEmpty=/var/spool/fbjq/queue/%I
+
+[Install]
+WantedBy=multi-user.target
