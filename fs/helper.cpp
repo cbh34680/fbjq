@@ -45,12 +45,12 @@ SystemdUnitHelper::SystemdUnitHelper(const libconfig::Config* app_cfg_, const st
             }
         }
 
-        if (::chown(subdir.c_str(), q_item.exec_user_uid, fbjqutil::DEFAULT_FILE_GROUP) != 0) {
+        if (::chown(subdir.c_str(), q_item.exec_user_uid, fbjqutil::QUEUE_FILE_GROUP) != 0) {
             LOG_ERROR("chown");
             return false;
         }
 
-        if (::chmod(subdir.c_str(), 0700) != 0) {
+        if (::chmod(subdir.c_str(), fbjqutil::QUEUE_DIR_PERMISSION) != 0) {
             LOG_ERROR("chmod");
             return false;
         }

@@ -65,7 +65,10 @@ void log_impl(const char* level, std::ostream& os, const std::source_location& l
 }
 
 constexpr const char* DEFAULT_CONFIG_FILE = "/etc/fbjq.conf";
-constexpr gid_t DEFAULT_FILE_GROUP = static_cast<gid_t>(0);
+constexpr gid_t QUEUE_FILE_GROUP = static_cast<gid_t>(0);
+constexpr mode_t QUEUE_DIR_PERMISSION = static_cast<mode_t>(0500);
+constexpr mode_t QUEUE_FILE_PERMISSION = static_cast<mode_t>(0400);
+
 constexpr int QUEUE_MAX_PROCESS = 32;
 constexpr int QUEUE_NAME_MAXLEN = 31;
 
@@ -93,7 +96,7 @@ int for_each_queue_item(const libconfig::Config* app_cfg, const std::function<bo
 
 // util/dirent.cpp
 int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path& target_dir,
-    const std::function<bool(const int, const std::filesystem::path&, const char*)>& on_file);
+    const std::function<bool(const int, const std::filesystem::path&, const char*)>& on_regular_file);
 
 // util/systemd.cpp
 bool systemd_unit_method(const std::string& unit_name, const char* method);

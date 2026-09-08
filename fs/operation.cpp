@@ -171,14 +171,14 @@ int fbjq_open(const char *path, struct fuse_file_info *fi)
     int rc = 0;
     ssize_t written = -1;
 
-    int fh = ::open(outpath, O_WRONLY | O_CREAT | O_EXCL, 0400);
+    int fh = ::open(outpath, O_WRONLY | O_CREAT | O_EXCL, fbjqutil::QUEUE_FILE_PERMISSION);
     if (fh == -1) {
         rc = -errno;
         LOG_ERROR("{}: open", outpath);
         goto EXIT_LABEL;
     }
 
-    if (::fchown(fh, q_item.exec_user_uid, fbjqutil::DEFAULT_FILE_GROUP) != 0) {
+    if (::fchown(fh, q_item.exec_user_uid, fbjqutil::QUEUE_FILE_GROUP) != 0) {
         rc = -errno;
         LOG_ERROR("chown");
         goto EXIT_LABEL;

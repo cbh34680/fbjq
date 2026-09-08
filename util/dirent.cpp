@@ -6,7 +6,7 @@ namespace fbjqutil {
 
 int for_each_file(const libconfig::Config* app_cfg,
     const std::filesystem::path& target_dir,
-    const std::function<bool(const int, const std::filesystem::path&, const char*)>& on_file)
+    const std::function<bool(const int, const std::filesystem::path&, const char*)>& on_regular_file)
 {
     namespace fs = std::filesystem;
     ENTER_FUNCTION();
@@ -76,7 +76,7 @@ int for_each_file(const libconfig::Config* app_cfg,
                 LOG_ERROR("exception: path={}: unknown", entry_path);
             }
 
-            if (! on_file(regfiles, entry_path, q_name)) {
+            if (! on_regular_file(regfiles, entry_path, q_name)) {
                 LOG_INFO("The callback rejected the continuation.");
                 break;
             }

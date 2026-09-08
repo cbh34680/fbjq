@@ -1,6 +1,7 @@
 // executor/main.cpp
 #include "local.hpp"
 #include <csignal>
+#include <fstream>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -61,35 +62,44 @@ int main_(int argc, char** argv)
     const fs::path archive_dir{ spool_dir / "archive" };
     const fs::path dead_dir{ spool_dir / "dead" };
 
+    siginfo_t siginfo{};
     const struct timespec timeout{};
 
-    const auto on_file = [&](const int loop, const auto& entry_path, const char* q_name) -> bool {
+    const auto on_regular_file = [&](const int loop, const auto& entry_path, const char* q_name) -> bool {
         if (loop >= app_args.max_files) {
             // .path の停止を検知するために一定数を処理したら .service を終了する
             LOG_INFO("The maximum number of processes has been reached.");
             return false;
         }
 
-        siginfo_t siginfo;
+        // check signal received
         const int signo = ::sigtimedwait(&sigset, &siginfo, &timeout);
         if (signo > 0) {
             LOG_INFO("Signal received: {}", signo);
             return false;
         }
 
-        const auto newpath = (q_name ? archive_dir : dead_dir) / entry_path.filename();
-        fs::rename(entry_path, newpath);
+        std::ifstream ifs{ entry_path, std::ios::in };
+        if (! ifs) {
+            throw std::runtime_error(std::format("{}: open error", entry_path));
+        }
+
+        //const bool success = parse_and_execute(entry_path);
+
+        //const auto newpath = (success ? archive_dir : dead_dir) / entry_path.filename();
+        //fs::rename(entry_path, newpath);
 
         return true;
     };
 
-    const auto rc = fbjqutil::for_each_file(app_cfg, spool_dir / "queue" / app_args.q_name, on_file);
+    const auto rc = fbjqutil::for_each_file(app_cfg, spool_dir / "queue" / app_args.q_name, on_regular_file);
     if (rc < 0) {
         LOG_ERROR("for_each_file: rc={}", rc);
         return EXIT_FAILURE;
     }
 
-    LOG_INFO("Validated {} files", rc);
+    LOG_INFO("Validated {} files, si_signo={}, si_code={}, si_errno={}, si_pid={}",
+        rc, siginfo.si_signo, siginfo.si_code, siginfo.si_errno, siginfo.si_pid);
 
     return EXIT_SUCCESS;
 }
