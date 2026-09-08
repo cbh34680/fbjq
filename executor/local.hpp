@@ -2,44 +2,19 @@
 #pragma once
 #include "fbjq-common.hpp"
 
-#include <queue>
-#include <mutex>
-#include <condition_variable>
+constexpr int DEFAULT_MAX_FILES = 50;
 
-class ThreadSafeQueue
+struct app_args_t
 {
-private:
-    std::queue<std::filesystem::path> queue_;
-    mutable std::mutex mutex_;
-    std::condition_variable cv_;
+    int check_only{ 0 };
+    const char* cfg_file{ fbjqutil::DEFAULT_CONFIG_FILE };
+    int max_files{ DEFAULT_MAX_FILES };
+    const char* q_name{ nullptr };
 
-public:
-    // 【生産者側】キューにデータを入れる
-    void push(std::filesystem::path value)
-    {
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            queue_.push(std::move(value));
-        }
-
-        // データが入ったので、待機中のワーカーを1つだけ起こす
-        cv_.notify_one();
-    }
-
-    // 【ワーカー側】安全にデータを取り出す（空なら待機）
-    std::filesystem::path pop()
-    {
-        std::unique_lock<std::mutex> lock(mutex_);
-
-        // キューが空の間はロックを解放して安全にスリープ待機
-        // データが入ると自動でロックを再獲得して抜ける
-        cv_.wait(lock, [this] { return !queue_.empty(); });
-
-        auto value = std::move(queue_.front());
-        queue_.pop();
-        return value;
+    std::string string() {
+        return std::format("check_only={}, cfg_file={}, max_files={}, q_name={}",
+            check_only, cfg_file, max_files, NULLABLE_CSTR(q_name));
     }
 };
 
-int for_each_queue_file(const libconfig::Config* app_cfg, const char* q_name,
-    const std::function<bool(const std::filesystem::directory_entry&, const int)>& should_continue);
+bool set_app_args(int argc, char** argv, app_args_t* app_args);

@@ -8,6 +8,19 @@
 
 #include "fbjq-common.hpp"
 
+// fs/args.cpp
+struct app_args_t
+{
+    int check_only{ 0 };
+    const char* cfg_file{ nullptr };
+
+    std::string string() {
+        return std::format("check_only={}, cfg_file={}", check_only, cfg_file);
+    }
+};
+
+bool set_app_args(struct fuse_args* args, app_args_t* app_args);
+
 // fs/operation.cpp
 struct app_context_t
 {
@@ -22,7 +35,7 @@ const struct fuse_operations* fbjq_operations();
 struct FuseArgsHelper
 {
     struct fuse_args args;
-    
+
     FuseArgsHelper(int argc, char** argv);
     ~FuseArgsHelper();
 };

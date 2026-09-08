@@ -1,46 +1,20 @@
 // fs/main.cpp
 #include "local.hpp"
 
-#define APP_OPT(t, p, v) { t, offsetof(struct app_args_t, p), v }
-
 namespace {
 
 int main_(int argc, char** argv)
 {
     namespace fs = std::filesystem;
-    (void) argc;
     ENTER_FUNCTION();
 
-    FuseArgsHelper fuseArgs_{ argc, argv };
-    struct fuse_args& args = fuseArgs_.args;
+    FuseArgsHelper fuseArgs{ argc, argv };
+    struct fuse_args& args = fuseArgs.args;
+    app_args_t app_args;
 
-    struct app_args_t
-    {
-        int check_only{ 0 };
-        const char* cfg_file{ nullptr };
-
-        std::string string() {
-            return std::format("check_only={}, cfg_file={}", check_only, cfg_file);
-        }
-    }
-    app_args;
-
-    const struct fuse_opt app_opts[] = {
-        APP_OPT("-C",          check_only, 1),
-        APP_OPT("--check",     check_only, 1),
-        APP_OPT("-c %s",       cfg_file,   0),
-        APP_OPT("--config=%s", cfg_file,   0),
-        FUSE_OPT_END
-    };
-
-    // 第4引数 (proc) に NULL を渡すことで、完全に offsetof による自動代入モードにする
-    if (::fuse_opt_parse(&args, &app_args, app_opts, nullptr) == -1) {
-        LOG_ERROR("fuse_opt_parse");
+    if (! set_app_args(&args, &app_args)) {
+        LOG_ERROR("set_app_args");
         return EXIT_FAILURE;
-    }
-
-    if (! app_args.cfg_file) {
-        app_args.cfg_file = fbjqutil::DEFAULT_CONFIG_FILE;
     }
 
     LOG_INFO("args: {}", app_args.string());

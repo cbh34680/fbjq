@@ -19,58 +19,13 @@ void signal_handler(int signum)
 
 int main_(int argc, char** argv)
 {
+    namespace fs = std::filesystem;
     ENTER_FUNCTION();
-    constexpr int DEFAULT_MAX_FILES = 500;
 
-    int opt = 0;
-    int option_index = 0;
-
-    // ロングオプションの定義
-    const struct option long_options[] = {
-        {"check",     no_argument,       nullptr, 'C'},
-        {"config",    required_argument, nullptr, 'c'},
-        {"max-files", required_argument, nullptr, 'n'},
-        {nullptr,     0,                 nullptr, 0  }
-    };
-
-    // オプション指定なし（または引数不足）のエラーメッセージを無効化する場合は 0 に設定
-    // opterr = 0;
-
-    struct
-    {
-        int check_only{ 0 };
-        const char* cfg_file{ fbjqutil::DEFAULT_CONFIG_FILE };
-        int max_files{ DEFAULT_MAX_FILES };
-
-        std::string string() {
-            return std::format("check_only={}, cfg_file={}, max_files={}", check_only, cfg_file, max_files);
-        }
-    }
-    app_args;
-
-    while ((opt = getopt_long(argc, argv, "Cc:n:", long_options, &option_index)) != -1) {
-        switch (opt)
-        {
-            case 'C':
-                app_args.check_only = 1;
-                break;
-
-            case 'c':
-                app_args.cfg_file = optarg;
-                break;
-
-            case 'n':
-                app_args.max_files = std::clamp(std::atoi(optarg), 1, 10000);
-                break;
-
-            case '?':
-                // 未知のオプション、または引数が不足している場合
-                LOG_ERROR("Unknown option or missing argument.");
-                return 1;
-
-            default:
-                break;
-        }
+    app_args_t app_args;
+    if (! set_app_args(argc, argv, &app_args)) {
+        LOG_ERROR("set_app_args");
+        return EXIT_FAILURE;
     }
 
     LOG_INFO("args: {}", app_args.string());
@@ -88,6 +43,8 @@ int main_(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
+    const auto* app_cfg = appConfigPtr.get();
+
     // ハンドラ関数の登録
     struct sigaction sa{};
     sa.sa_handler = signal_handler;
@@ -102,10 +59,14 @@ int main_(int argc, char** argv)
     ::sigaction(SIGINT, &sa, nullptr);
 
     //
-    const auto should_continue = [&](const auto& entry, const int moved) -> bool {
-        (void) entry;
+    const fs::path spool_dir{ app_cfg->lookup("spool_dir").c_str() };
+    LOG_DEBUG("spool_dir={}", spool_dir);
 
-        if (moved >= app_args.max_files) {
+    const fs::path queue_dir{ spool_dir / "queue" };
+    const fs::path dead_dir{ spool_dir / "dead" };
+
+    const auto on_file = [&](const int loop, const auto& entry_path, const char* q_name) -> bool {
+        if (loop >= app_args.max_files) {
             // .path の停止を検知するために一定数を処理したら .service を終了する
             LOG_INFO("The maximum number of processes has been reached.");
             return false;
@@ -116,16 +77,19 @@ int main_(int argc, char** argv)
             return false;
         }
 
+        const auto newpath = (q_name ? queue_dir / q_name : dead_dir) / entry_path.filename();
+        fs::rename(entry_path, newpath);
+
         return true;
     };
 
-    const auto moved = for_each_delivery_file(appConfigPtr.get(), should_continue);
-    if (moved < 0) {
-        LOG_ERROR("for_each_delivery_file: moved={}", moved);
+    const auto rc = fbjqutil::for_each_file(app_cfg, spool_dir / "delivery", on_file);
+    if (rc < 0) {
+        LOG_ERROR("for_each_file: rc={}", rc);
         return EXIT_FAILURE;
     }
 
-    LOG_INFO("Validated {} files, g_graceful_stop={}", moved, g_graceful_stop.load());
+    LOG_INFO("Validated {} files, g_graceful_stop={}", rc, g_graceful_stop.load());
 
     return EXIT_SUCCESS;
 }

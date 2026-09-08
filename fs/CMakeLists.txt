@@ -1,5 +1,5 @@
 # fs/CMakeLists.txt
-add_executable(fbjq-fs main.cpp operation.cpp helper.cpp)
+add_executable(fbjq-fs main.cpp args.cpp operation.cpp helper.cpp)
 
 target_compile_definitions(fbjq-fs PRIVATE
     $<$<CONFIG:Debug>:DEBUG>

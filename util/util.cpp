@@ -1,5 +1,6 @@
 // util/util.cpp
 #include "fbjq-common.hpp"
+#include <fstream>
 
 namespace fbjqutil {
 
@@ -84,6 +85,80 @@ bool get_gid_by_name(const char* group_name, gid_t* out_gid)
     LOG_ERROR("getgrnam_r");
 
     return false;
+}
+
+int for_each_file(const libconfig::Config* app_cfg,
+    const std::filesystem::path& target_dir,
+    const std::function<bool(const int, const std::filesystem::path&, const char*)>& on_file)
+{
+    namespace fs = std::filesystem;
+    ENTER_FUNCTION();
+
+    const fs::path spool_dir{ app_cfg->lookup("spool_dir").c_str() };
+    LOG_DEBUG("spool_dir={}", spool_dir);
+
+    const fs::path dead_dir{ spool_dir / "dead" };
+
+    try {
+        int regfiles = 0;
+
+        for (const auto& entry : fs::directory_iterator(target_dir)) {
+            const auto& entry_path{ entry.path() };
+            LOG_DEBUG("entry path={}", entry_path);
+
+            if (! entry.is_regular_file()) {
+                const auto remove_n = fs::remove_all(entry_path);
+                LOG_INFO("remove {} files", remove_n);
+                continue;
+            }
+
+            fbjqutil::request_header_t header;
+            const char* q_name = nullptr;
+
+            try {
+                std::ifstream ifs{ entry_path, std::ios::in | std::ios::binary };
+                if (! ifs) {
+                    throw std::runtime_error(std::format("{}: open error", entry_path));
+                }
+                // open ok
+
+                if (! ifs.read(reinterpret_cast<char*>(&header), sizeof(header))) {
+                    throw std::runtime_error(std::format("{}: read error", entry_path));
+                }
+                // read header ok
+
+                if (! fbjqutil::is_valid_header(app_cfg, header)) {
+                    throw std::runtime_error(std::format("{}: invalid header", entry_path));
+                }
+
+                LOG_DEBUG("ok");
+
+                q_name = header.q_name;
+            } catch (const std::exception& ex) {
+                LOG_ERROR("exception: path={}: what={}", entry_path, ex.what());
+
+            } catch (...) {
+                LOG_ERROR("exception: path={}: unknown", entry_path);
+            }
+
+            if (! on_file(regfiles, entry_path, q_name)) {
+                LOG_INFO("The callback rejected the continuation.");
+                break;
+            }
+
+            ++regfiles;
+        }
+
+        return regfiles;
+
+    } catch (const std::exception& ex) {
+        LOG_ERROR("exception what={}", ex.what());
+        return -1;
+
+    } catch (...) {
+        LOG_ERROR("unknown exception");
+        return -1;
+    }
 }
 
 } // namespace fbjqutil

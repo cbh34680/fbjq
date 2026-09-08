@@ -85,6 +85,8 @@ std::int64_t now_nanos();
 bool get_path_from_fd(int fd, char* buf, size_t buf_siz);
 bool get_uid_by_name(const char* user_name, uid_t* out_uid);
 bool get_gid_by_name(const char* group_name, gid_t* out_gid);
+int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path& target_dir,
+    const std::function<bool(const int, const std::filesystem::path&, const char*)>& on_file);
 
 // util/config.cpp
 std::unique_ptr<libconfig::Config> load_config(const char* cfg_file);
