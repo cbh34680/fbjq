@@ -124,8 +124,8 @@ int fbjq_open(const char *path, struct fuse_file_info *fi)
         return -EPERM;
     }
 
-    const char* cfg_version = nullptr;
-    if (! APP_CTX()->app_cfg->lookupValue("version", cfg_version)) {
+    const char* cfg_version = APP_CTX()->app_cfg->lookup("version").c_str();
+    if (! cfg_version) {
         LOG_ERROR("version: no key");
         return -ENODEV;
     }
