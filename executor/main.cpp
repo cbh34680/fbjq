@@ -1,7 +1,6 @@
 // executor/main.cpp
 #include "local.hpp"
 #include <csignal>
-#include <getopt.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -41,9 +40,8 @@ int main_(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    sigset_t sigset;
-
     // 1. ブロックしたいシグナルのセットを作成
+    sigset_t sigset;
     ::sigemptyset(&sigset);
     ::sigaddset(&sigset, SIGINT);
     ::sigaddset(&sigset, SIGTERM);
@@ -85,7 +83,7 @@ int main_(int argc, char** argv)
         return true;
     };
 
-    const auto rc = fbjqutil::for_each_file(app_cfg, spool_dir / "tmp", on_file);
+    const auto rc = fbjqutil::for_each_file(app_cfg, spool_dir / "queue" / app_args.q_name, on_file);
     if (rc < 0) {
         LOG_ERROR("for_each_file: rc={}", rc);
         return EXIT_FAILURE;

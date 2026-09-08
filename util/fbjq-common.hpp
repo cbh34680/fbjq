@@ -85,13 +85,15 @@ std::int64_t now_nanos();
 bool get_path_from_fd(int fd, char* buf, size_t buf_siz);
 bool get_uid_by_name(const char* user_name, uid_t* out_uid);
 bool get_gid_by_name(const char* group_name, gid_t* out_gid);
-int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path& target_dir,
-    const std::function<bool(const int, const std::filesystem::path&, const char*)>& on_file);
 
 // util/config.cpp
 std::unique_ptr<libconfig::Config> load_config(const char* cfg_file);
 bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_item_view_t* queue_item);
 int for_each_queue_item(const libconfig::Config* app_cfg, const std::function<bool(const char* q_name, const queue_item_view_t& q_item)>& callback);
+
+// util/dirent.cpp
+int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path& target_dir,
+    const std::function<bool(const int, const std::filesystem::path&, const char*)>& on_file);
 
 // util/systemd.cpp
 bool systemd_unit_method(const std::string& unit_name, const char* method);
@@ -123,8 +125,6 @@ struct request_header_t
 
 static_assert(sizeof(request_header_t) == 128, "Header size must be 128 bytes");
 static_assert(std::is_trivially_copyable_v<request_header_t>, "Header must be trivial");
-
-bool is_valid_header(const libconfig::Config* app_cfg, const request_header_t& header);
 
 } // namespace fbjqutil
 

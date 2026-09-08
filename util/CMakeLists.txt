@@ -1,5 +1,5 @@
 # util/CMakeLists.txt
-add_library(fbjq-util util.cpp config.cpp systemd.cpp)
+add_library(fbjq-util util.cpp config.cpp dirent.cpp systemd.cpp)
 
 target_compile_definitions(fbjq-util PRIVATE
     $<$<CONFIG:Debug>:DEBUG>

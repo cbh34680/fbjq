@@ -2,7 +2,6 @@
 #include "local.hpp"
 #include <csignal>
 #include <atomic>
-#include <getopt.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 

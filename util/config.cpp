@@ -272,35 +272,4 @@ int for_each_queue_item(const libconfig::Config* app_cfg, const std::function<bo
     return item_count;
 }
 
-bool is_valid_header(const libconfig::Config* app_cfg, const request_header_t& header) {
-    std::string cfg_version;
-    if (! app_cfg->lookupValue("version", cfg_version)) {
-        LOG_ERROR("version: no key");
-        return -1;
-    }
-
-    if (std::string_view(std::begin(header.magic), std::end(header.magic)) == "FBJQ" &&
-        std::string_view(std::begin(header.cigam), std::end(header.cigam)) == "QJBF") {
-        // go next
-
-    } else {
-        LOG_ERROR("invalid magic");
-        return false;
-    }
-    // check magic ok
-
-    if (std::string_view(std::begin(header.version), std::end(header.version)) != cfg_version) {
-        LOG_ERROR("invalid version");
-        return false;
-    }
-
-    if (! fbjqutil::get_queue_item(app_cfg, header.q_name, nullptr)) {
-        LOG_ERROR("get_queue_item");
-        return false;
-    }
-    // check queue ok
-
-    return true;
-}
-
 } // namespace fbjqutil
