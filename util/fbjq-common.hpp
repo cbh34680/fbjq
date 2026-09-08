@@ -122,7 +122,20 @@ struct request_header_t
 static_assert(sizeof(request_header_t) == 128, "Header size must be 128 bytes");
 static_assert(std::is_trivially_copyable_v<request_header_t>, "Header must be trivial");
 
+bool is_valid_header(const libconfig::Config* app_cfg, const request_header_t& header);
+
 } // namespace fbjqutil
+
+template <>
+struct std::formatter<std::filesystem::path> {
+    constexpr auto parse(std::format_parse_context& ctx) {
+        return ctx.begin();
+    }
+
+    auto format(const std::filesystem::path& p, std::format_context& ctx) const {
+        return std::format_to(ctx.out(), "{}", p.string());
+    }
+};
 
 #define LOG_ERROR(...) fbjqutil::log_impl("ERR", std::cerr, std::source_location::current(), __VA_ARGS__)
 

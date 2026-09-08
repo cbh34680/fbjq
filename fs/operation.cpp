@@ -100,7 +100,7 @@ int fbjq_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offs
 
     const auto rc = fbjqutil::for_each_queue_item(APP_CTX()->app_cfg, append_queue);
     if (rc < 0) {
-        return -EIO;
+        return -ENODEV;
     }
 
     return 0;
@@ -124,7 +124,11 @@ int fbjq_open(const char *path, struct fuse_file_info *fi)
         return -EPERM;
     }
 
-    const struct fuse_context* fuse_ctx = fuse_get_context();
+    const char* cfg_version = nullptr;
+    if (! APP_CTX()->app_cfg->lookupValue("version", cfg_version)) {
+        LOG_ERROR("version: no key");
+        return -ENODEV;
+    }
 
     const char* q_name = path + 1;
     fbjqutil::queue_item_view_t q_item;
@@ -141,10 +145,12 @@ int fbjq_open(const char *path, struct fuse_file_info *fi)
     char outpath[PATH_MAX];
     std::snprintf(outpath, sizeof(outpath), "%s/tmp/%" PRId64 "-%" PRIu64 ".dat", APP_CTX()->spool_dir.c_str(), now, seq);
 
+    const struct fuse_context* fuse_ctx = fuse_get_context();
+
     fbjqutil::request_header_t header
     {
         .magic              = { 'F', 'B', 'J', 'Q' },
-        .version            = { '0', '0', '1', '0' },
+        .version            = { '\0' },
         .client_uid         = static_cast<uint32_t>(fuse_ctx->uid),
         .client_gid         = static_cast<uint32_t>(fuse_ctx->gid),
         .client_pid         = static_cast<int32_t>(fuse_ctx->pid),
@@ -158,6 +164,7 @@ int fbjq_open(const char *path, struct fuse_file_info *fi)
         .cigam              = { 'Q', 'J', 'B', 'F' },
     };
 
+    ::memcpy(header.version, cfg_version, sizeof(header.version));
     ::strncpy(header.q_name, q_name, sizeof(header.q_name));
 
     // write header

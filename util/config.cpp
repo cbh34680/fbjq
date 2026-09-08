@@ -130,21 +130,31 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
         return nullptr;
     }
 
-    std::string path_str;
-    if (! app_cfg->lookupValue("spool_dir", path_str)) {
-        LOG_ERROR("spool_dir: not exists");
+    std::string cfg_version;
+    if (! app_cfg->lookupValue("version", cfg_version)) {
+        LOG_ERROR("version: no key");
         return nullptr;
     }
 
-    std::filesystem::path spool_dir{ path_str };
+    if (cfg_version.length() != 4) {
+        LOG_ERROR("cfg_version: bad key");
+        return nullptr;
+    }
 
+    std::string path_str;
+    if (! app_cfg->lookupValue("spool_dir", path_str)) {
+        LOG_ERROR("spool_dir: no key");
+        return nullptr;
+    }
+
+    const std::filesystem::path spool_dir{ path_str };
     if (spool_dir.empty()) {
         LOG_ERROR("spool_dir: empty");
         return nullptr;
     }
 
     if (! std::filesystem::is_directory(spool_dir)) {
-        LOG_ERROR("{}: not directory", spool_dir.string());
+        LOG_ERROR("{}: not directory", spool_dir);
         return nullptr;
     }
 
@@ -160,7 +170,7 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
         const auto path{ spool_dir / *subdir };
 
         if (! std::filesystem::is_directory(path)) {
-            LOG_ERROR("{}: not directory", path.string());
+            LOG_ERROR("{}: not directory", path);
             return nullptr;
         }
     }
@@ -172,6 +182,7 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
         return true;
     };
 
+    // check all items
     if (for_each_queue_item(app_cfg, noop) <= 0) {
         LOG_ERROR("no queue item");
         return nullptr;
@@ -259,6 +270,37 @@ int for_each_queue_item(const libconfig::Config* app_cfg, const std::function<bo
 
     LOG_DEBUG("item_count={}", item_count);
     return item_count;
+}
+
+bool is_valid_header(const libconfig::Config* app_cfg, const request_header_t& header) {
+    std::string cfg_version;
+    if (! app_cfg->lookupValue("version", cfg_version)) {
+        LOG_ERROR("version: no key");
+        return -1;
+    }
+
+    if (std::string_view(std::begin(header.magic), std::end(header.magic)) == "FBJQ" &&
+        std::string_view(std::begin(header.cigam), std::end(header.cigam)) == "QJBF") {
+        // go next
+
+    } else {
+        LOG_ERROR("invalid magic");
+        return false;
+    }
+    // check magic ok
+
+    if (std::string_view(std::begin(header.version), std::end(header.version)) != cfg_version) {
+        LOG_ERROR("invalid version");
+        return false;
+    }
+
+    if (! fbjqutil::get_queue_item(app_cfg, header.q_name, nullptr)) {
+        LOG_ERROR("get_queue_item");
+        return false;
+    }
+    // check queue ok
+
+    return true;
 }
 
 } // namespace fbjqutil

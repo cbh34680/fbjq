@@ -13,7 +13,7 @@ int main_(int argc, char** argv)
 
     FuseArgsHelper fuseArgs_{ argc, argv };
     struct fuse_args& args = fuseArgs_.args;
-    
+
     struct app_args_t
     {
         int check_only{ 0 };
@@ -62,7 +62,7 @@ int main_(int argc, char** argv)
 
     const auto* app_cfg = appConfigPtr.get();
     const fs::path spool_dir{ app_cfg->lookup("spool_dir").c_str() };
-    LOG_DEBUG("spool_dir={}", spool_dir.string());
+    LOG_DEBUG("spool_dir={}", spool_dir);
 
     // FUSE コンテキストの作成
     app_context_t app_ctx = {
@@ -89,7 +89,7 @@ int main(int argc, char** argv)
     ENTER_FUNCTION();
 
     ::umask(0);
-    
+
     const int rc = main_(argc, argv);
     LOG_INFO("program return-code={}", rc);
 

@@ -32,7 +32,7 @@ SystemdUnitHelper::SystemdUnitHelper(const libconfig::Config* app_cfg_, const st
                 // go next
 
             } else {
-                LOG_ERROR("{}: exists, but not directory", subdir.string());
+                LOG_ERROR("{}: exists, but not directory", subdir);
                 return false;
             }
         } else {
@@ -40,7 +40,7 @@ SystemdUnitHelper::SystemdUnitHelper(const libconfig::Config* app_cfg_, const st
             fs::create_directory(subdir, ec);
 
             if (ec) {
-                LOG_ERROR("{}: create: message={}", subdir.string(), ec.message());
+                LOG_ERROR("{}: create: message={}", subdir, ec.message());
                 return false;
             }
         }

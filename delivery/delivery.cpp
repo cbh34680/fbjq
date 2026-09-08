@@ -10,7 +10,7 @@ int for_each_delivery_file(const libconfig::Config* app_cfg,
     ENTER_FUNCTION();
 
     const fs::path spool_dir{ app_cfg->lookup("spool_dir").c_str() };
-    LOG_DEBUG("spool_dir={}", spool_dir.string());
+    LOG_DEBUG("spool_dir={}", spool_dir);
 
     try {
         int moved = 0;
@@ -28,7 +28,7 @@ int for_each_delivery_file(const libconfig::Config* app_cfg,
             }
 
             const auto& entry_path{ entry.path() };
-            LOG_DEBUG("entry path={}", entry_path.string());
+            LOG_DEBUG("entry path={}", entry_path);
 
             bool success = false;
             fbjqutil::request_header_t header;
@@ -45,19 +45,9 @@ int for_each_delivery_file(const libconfig::Config* app_cfg,
                 }
                 // read header ok
 
-                if (std::string_view(std::begin(header.magic), std::end(header.magic)) == "FBJQ" &&
-                    std::string_view(std::begin(header.cigam), std::end(header.cigam)) == "QJBF") {
-                    // go next
-
-                } else {
-                    throw std::runtime_error("invalid magic");
+                if (! fbjqutil::is_valid_header(app_cfg, header)) {
+                    throw std::runtime_error("invalid header");
                 }
-                // check magic ok
-
-                if (! fbjqutil::get_queue_item(app_cfg, header.q_name, nullptr)) {
-                    throw std::runtime_error("get_queue_item");
-                }
-                // check queue ok
 
                 LOG_DEBUG("ok");
 
@@ -73,7 +63,7 @@ int for_each_delivery_file(const libconfig::Config* app_cfg,
                 ? spool_dir / "queue" / header.q_name / entry_path.filename()
                 : spool_dir / "dead"  / entry_path.filename();
 
-            LOG_INFO("move: from={} to={}", entry_path.string(), newpath.string());
+            LOG_INFO("move: from={} to={}", entry_path, newpath);
             fs::rename(entry_path, newpath);
 
             ++moved;
