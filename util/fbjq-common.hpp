@@ -69,8 +69,9 @@ constexpr gid_t QUEUE_FILE_GROUP = static_cast<gid_t>(0);
 constexpr mode_t QUEUE_DIR_PERMISSION = static_cast<mode_t>(0500);
 constexpr mode_t QUEUE_FILE_PERMISSION = static_cast<mode_t>(0400);
 
+constexpr int VERSION_MAXLEN = 11;
+constexpr int QUEUE_NAME_MAXLEN = 63;
 constexpr int QUEUE_MAX_PROCESS = 32;
-constexpr int QUEUE_NAME_MAXLEN = 31;
 
 struct queue_item_view_t
 {
@@ -94,10 +95,6 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file);
 bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_item_view_t* queue_item);
 int for_each_queue_item(const libconfig::Config* app_cfg, const std::function<bool(const char* q_name, const queue_item_view_t& q_item)>& callback);
 
-// util/dirent.cpp
-int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path& target_dir,
-    const std::function<bool(const int, const std::filesystem::path&, const char*)>& on_regular_file);
-
 // util/systemd.cpp
 bool systemd_unit_method(const std::string& unit_name, const char* method);
 
@@ -109,10 +106,12 @@ inline bool systemctl_stop_unit(const std::string& unit_name) {
     return systemd_unit_method(unit_name, "StopUnit");
 }
 
-struct request_header_t
+struct request_file_header_t
 {
     char magic[4];
-    char version[4];
+    char version[VERSION_MAXLEN + 1];       // 16
+    std::int64_t filename_ns;
+    std::uint64_t filename_seq;             // 32
     std::uint32_t client_uid;
     std::uint32_t client_gid;
     std::int32_t client_pid;
@@ -120,14 +119,19 @@ struct request_header_t
     std::int32_t fuse_tid;
     std::uint32_t exec_user_uid;
     std::uint32_t allow_group_gid;
-    char padding1[4];
-    char q_name[QUEUE_NAME_MAXLEN + 1];
-    char padding2[52];
-    char cigam[4];
+    char padding1[4];                       // 64
+    char q_name[QUEUE_NAME_MAXLEN + 1];     // 128
+    char padding2[128];
 };
 
-static_assert(sizeof(request_header_t) == 128, "Header size must be 128 bytes");
-static_assert(std::is_trivially_copyable_v<request_header_t>, "Header must be trivial");
+static_assert(sizeof(request_file_header_t) == 256, "Header size must be 256 bytes");
+static_assert(std::is_trivially_copyable_v<request_file_header_t>, "Header must be trivial");
+
+// util/dirent.cpp
+int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path& target_dir,
+    const std::function<bool(const int, const std::filesystem::path&, const request_file_header_t*)>& on_regular_file);
+
+constexpr const char* REQUEST_FILE_EXT = ".req";
 
 } // namespace fbjqutil
 

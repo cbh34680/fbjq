@@ -111,7 +111,6 @@ int fbjq_open(const char *path, struct fuse_file_info *fi)
     ENTER_FUNCTION();
 
     const int acc_mode = fi->flags & O_ACCMODE;
-
     if (acc_mode == O_WRONLY || acc_mode == O_RDWR) {
         // go next
     } else {
@@ -138,19 +137,22 @@ int fbjq_open(const char *path, struct fuse_file_info *fi)
         return -ENOENT;
     }
 
-    const auto now = fbjqutil::now_nanos();
-    static std::atomic_uint64_t sequence{ 0 };
-    const auto seq = sequence.fetch_add(1, std::memory_order_relaxed);
+    const auto filename_ns = fbjqutil::now_nanos();
+    static std::atomic_uint64_t sequence{ 1 };
+    const auto filename_seq = sequence.fetch_add(1, std::memory_order_relaxed);
 
     char outpath[PATH_MAX];
-    std::snprintf(outpath, sizeof(outpath), "%s/tmp/%" PRId64 "-%" PRIu64 ".dat", APP_CTX()->spool_dir.c_str(), now, seq);
+    std::snprintf(outpath, sizeof(outpath), "%s/tmp/%" PRId64 "-%" PRIu64 "%s",
+        APP_CTX()->spool_dir.c_str(), filename_ns, filename_seq, fbjqutil::REQUEST_FILE_EXT);
 
     const struct fuse_context* fuse_ctx = fuse_get_context();
 
-    fbjqutil::request_header_t header
+    fbjqutil::request_file_header_t rfhdr
     {
         .magic              = { 'F', 'B', 'J', 'Q' },
         .version            = { '\0' },
+        .filename_ns        = static_cast<int64_t>(filename_ns),
+        .filename_seq       = static_cast<uint64_t>(filename_seq),
         .client_uid         = static_cast<uint32_t>(fuse_ctx->uid),
         .client_gid         = static_cast<uint32_t>(fuse_ctx->gid),
         .client_pid         = static_cast<int32_t>(fuse_ctx->pid),
@@ -161,11 +163,10 @@ int fbjq_open(const char *path, struct fuse_file_info *fi)
         .padding1           = { '\0' },
         .q_name             = { '\0' },
         .padding2           = { '\0' },
-        .cigam              = { 'Q', 'J', 'B', 'F' },
     };
 
-    ::memcpy(header.version, cfg_version, sizeof(header.version));
-    ::strncpy(header.q_name, q_name, sizeof(header.q_name));
+    ::strncpy(rfhdr.version, cfg_version, sizeof(rfhdr.version));
+    ::strncpy(rfhdr.q_name, q_name, sizeof(rfhdr.q_name));
 
     // write header
     int rc = 0;
@@ -184,16 +185,16 @@ int fbjq_open(const char *path, struct fuse_file_info *fi)
         goto EXIT_LABEL;
     }
 
-    written = TEMP_FAILURE_RETRY(::write(fh, &header, sizeof(header)));
+    written = TEMP_FAILURE_RETRY(::write(fh, &rfhdr, sizeof(rfhdr)));
     if (written == -1) {
         rc = -errno;
         LOG_ERROR("write");
         goto EXIT_LABEL;
     }
 
-    if (written != sizeof(header)) {
+    if (written != sizeof(rfhdr)) {
         rc = -EIO;
-        LOG_ERROR("written={} <> size={}", written, sizeof(header));
+        LOG_ERROR("written={} <> size={}", written, sizeof(rfhdr));
         goto EXIT_LABEL;
     }
 
@@ -219,7 +220,7 @@ int fbjq_write(const char* path, const char* buf, size_t size, off_t offset, str
         return -EBADF;
     }
 
-    ssize_t written = TEMP_FAILURE_RETRY(::pwrite(fd, buf, size, offset + sizeof(fbjqutil::request_header_t)));
+    ssize_t written = TEMP_FAILURE_RETRY(::pwrite(fd, buf, size, offset + sizeof(fbjqutil::request_file_header_t)));
     if (written == -1) {
         LOG_ERROR("pwrite");
         return -errno;

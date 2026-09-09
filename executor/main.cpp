@@ -65,7 +65,7 @@ int main_(int argc, char** argv)
     siginfo_t siginfo{};
     const struct timespec timeout{};
 
-    const auto on_regular_file = [&](const int loop, const auto& entry_path, const char* q_name) -> bool {
+    const auto on_regular_file = [&](const int loop, const auto& entry_path, const auto* rfhdr) -> bool {
         if (loop >= app_args.max_files) {
             // .path の停止を検知するために一定数を処理したら .service を終了する
             LOG_INFO("The maximum number of processes has been reached.");

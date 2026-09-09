@@ -136,8 +136,8 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
         return nullptr;
     }
 
-    if (cfg_version.length() != 4) {
-        LOG_ERROR("cfg_version: bad key");
+    if (cfg_version.length() > VERSION_MAXLEN) {
+        LOG_ERROR("cfg_version: bad value");
         return nullptr;
     }
 

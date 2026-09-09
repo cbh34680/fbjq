@@ -1,17 +1,18 @@
 // util/dirent.cpp
 #include "fbjq-common.hpp"
+#include <cstring>
 #include <fstream>
 
 namespace fbjqutil {
 
 int for_each_file(const libconfig::Config* app_cfg,
     const std::filesystem::path& target_dir,
-    const std::function<bool(const int, const std::filesystem::path&, const char*)>& on_regular_file)
+    const std::function<bool(const int, const std::filesystem::path&, const request_file_header_t*)>& on_regular_file)
 {
     namespace fs = std::filesystem;
     ENTER_FUNCTION();
 
-    const std::string cfg_version{ app_cfg->lookup("version").c_str() };
+    const char* cfg_version{ app_cfg->lookup("version").c_str() };
     LOG_DEBUG("cfg_version={}", cfg_version);
 
     const fs::path spool_dir{ app_cfg->lookup("spool_dir").c_str() };
@@ -32,8 +33,8 @@ int for_each_file(const libconfig::Config* app_cfg,
                 continue;
             }
 
-            request_header_t header;
-            const char* q_name = nullptr;
+            request_file_header_t rfhdr_;
+            request_file_header_t* rfhdr = nullptr;
 
             try {
                 std::ifstream ifs{ entry_path, std::ios::in | std::ios::binary };
@@ -42,13 +43,12 @@ int for_each_file(const libconfig::Config* app_cfg,
                 }
                 // open ok
 
-                if (! ifs.read(reinterpret_cast<char*>(&header), sizeof(header))) {
+                if (! ifs.read(reinterpret_cast<char*>(&rfhdr_), sizeof(rfhdr_))) {
                     throw std::runtime_error(std::format("{}: read error", entry_path));
                 }
                 // read header ok
 
-                if (std::string_view(std::begin(header.magic), std::end(header.magic)) == "FBJQ" &&
-                    std::string_view(std::begin(header.cigam), std::end(header.cigam)) == "QJBF") {
+                if (std::string_view(std::begin(rfhdr_.magic), std::end(rfhdr_.magic)) == "FBJQ") {
                     // go next
 
                 } else {
@@ -56,19 +56,19 @@ int for_each_file(const libconfig::Config* app_cfg,
                 }
                 // check magic ok
 
-                if (std::string_view(std::begin(header.version), std::end(header.version)) != cfg_version) {
+                if (::strcmp(rfhdr_.version, cfg_version) != 0) {
                     throw std::runtime_error(std::format("{}: invalid version", entry_path));
                 }
                 // check version ok
 
-                if (! get_queue_item(app_cfg, header.q_name, nullptr)) {
+                if (! get_queue_item(app_cfg, rfhdr_.q_name, nullptr)) {
                     throw std::runtime_error(std::format("{}: get_queue_item", entry_path));
                 }
                 // check queue-item ok
 
                 LOG_DEBUG("ok");
 
-                q_name = header.q_name;
+                rfhdr = &rfhdr_;
             } catch (const std::exception& ex) {
                 LOG_ERROR("exception: path={}: what={}", entry_path, ex.what());
 
@@ -76,7 +76,7 @@ int for_each_file(const libconfig::Config* app_cfg,
                 LOG_ERROR("exception: path={}: unknown", entry_path);
             }
 
-            if (! on_regular_file(regfiles, entry_path, q_name)) {
+            if (! on_regular_file(regfiles, entry_path, rfhdr)) {
                 LOG_INFO("The callback rejected the continuation.");
                 break;
             }
