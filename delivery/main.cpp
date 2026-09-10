@@ -64,13 +64,7 @@ int main_(int argc, char** argv)
     const fs::path queue_dir{ spool_dir / "queue" };
     const fs::path dead_dir{ spool_dir / "dead" };
 
-    const auto on_regular_file = [&](const int loop, const auto& entry_path, const auto* rfhdr) -> bool {
-        if (loop >= app_args.max_files) {
-            // .path の停止を検知するために一定数を処理したら .service を終了する
-            LOG_INFO("The maximum number of processes has been reached.");
-            return false;
-        }
-
+    const auto on_regular_file = [&](const auto& entry_path, const auto* rfhdr) -> bool {
         if (g_graceful_stop) {
             LOG_INFO("receive signal, graceful stop");
             return false;
@@ -82,7 +76,9 @@ int main_(int argc, char** argv)
         return true;
     };
 
-    const auto rc = fbjqutil::for_each_file(app_cfg, spool_dir / "delivery", on_regular_file);
+    const auto delivery_dir{ spool_dir / "delivery" };
+
+    const auto rc = fbjqutil::for_each_file(app_cfg, delivery_dir, app_args.max_files, on_regular_file);
     if (rc < 0) {
         LOG_ERROR("for_each_file: rc={}", rc);
         return EXIT_FAILURE;

@@ -5,9 +5,8 @@
 
 namespace fbjqutil {
 
-int for_each_file(const libconfig::Config* app_cfg,
-    const std::filesystem::path& target_dir,
-    const std::function<bool(const int, const std::filesystem::path&, const request_file_header_t*)>& on_regular_file)
+int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path& target_dir, const int max_files,
+    const std::function<bool(const std::filesystem::path&, const request_file_header_t*)>& on_regular_file)
 {
     namespace fs = std::filesystem;
     ENTER_FUNCTION();
@@ -76,12 +75,20 @@ int for_each_file(const libconfig::Config* app_cfg,
                 LOG_ERROR("exception: path={}: unknown", entry_path);
             }
 
-            if (! on_regular_file(regfiles, entry_path, rfhdr)) {
+            if (! on_regular_file(entry_path, rfhdr)) {
                 LOG_INFO("The callback rejected the continuation.");
                 break;
             }
 
             ++regfiles;
+
+            if (max_files > 0) {
+                if (regfiles >= max_files) {
+                    // .path の停止を検知するために一定数を処理したら .service を終了する
+                    LOG_INFO("The maximum number of processes has been reached.");
+                    break;
+                }
+            }
         }
 
         return regfiles;

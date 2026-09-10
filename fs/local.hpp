@@ -11,8 +11,8 @@
 // fs/args.cpp
 struct app_args_t
 {
-    int check_only{ 0 };
-    char* cfg_file{ nullptr };
+    int check_only = 0;
+    char* cfg_file = nullptr;
 
     ~app_args_t() {
         if (cfg_file) {
@@ -30,9 +30,9 @@ bool set_app_args(struct fuse_args* args, app_args_t* app_args);
 // fs/operation.cpp
 struct app_context_t
 {
-    const libconfig::Config* app_cfg{ nullptr };
+    const libconfig::Config* app_cfg = nullptr;
     const std::filesystem::path& spool_dir;
-    const time_t boot_time{ static_cast<time_t>(-1) };
+    const time_t boot_time = static_cast<time_t>(-1);
 };
 
 const struct fuse_operations* fbjq_operations();
@@ -51,6 +51,6 @@ struct SystemdUnitHelper
     bool success = false;
     const libconfig::Config* app_cfg;
 
-    SystemdUnitHelper(const libconfig::Config* app_cfg_, const std::filesystem::path& spool_dir);
+    SystemdUnitHelper(const libconfig::Config* arg_app_cfg, const std::filesystem::path& spool_dir);
     ~SystemdUnitHelper();
 };

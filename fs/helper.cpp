@@ -13,8 +13,8 @@ FuseArgsHelper::~FuseArgsHelper()
     fuse_opt_free_args(&args);
 }
 
-SystemdUnitHelper::SystemdUnitHelper(const libconfig::Config* app_cfg_, const std::filesystem::path& spool_dir)
-    : app_cfg{ app_cfg_ }
+SystemdUnitHelper::SystemdUnitHelper(const libconfig::Config* arg_app_cfg, const std::filesystem::path& spool_dir)
+    : app_cfg{ arg_app_cfg }
 {
     namespace fs = std::filesystem;
     ENTER_FUNCTION();

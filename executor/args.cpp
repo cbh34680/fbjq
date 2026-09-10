@@ -1,5 +1,8 @@
 // executor/args.cpp
 #include "local.hpp"
+#include <algorithm>  // std::clamp
+#include <climits>    // INT_MAX
+#include <cstdlib>    // std::atoi
 #include <getopt.h>
 
 bool set_app_args(int argc, char** argv, app_args_t* app_args)
@@ -33,7 +36,7 @@ bool set_app_args(int argc, char** argv, app_args_t* app_args)
                 break;
 
             case 'n':
-                app_args->max_files = std::clamp(std::atoi(optarg), 1, 1000);
+                app_args->max_files = std::clamp(std::atoi(optarg), 0, INT_MAX);
                 break;
 
             case 'q':

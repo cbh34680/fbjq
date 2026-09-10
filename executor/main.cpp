@@ -1,7 +1,6 @@
 // executor/main.cpp
 #include "local.hpp"
 #include <sys/stat.h>
-#include <sys/types.h>
 
 namespace {
 
@@ -51,7 +50,7 @@ int main_(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    return for_each_queue_file(&sigset, &app_args, app_cfg);
+    return for_each_queue_file(&app_args, app_cfg, &sigset);
 }
 
 } // namespace

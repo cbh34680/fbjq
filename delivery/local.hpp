@@ -2,13 +2,11 @@
 #pragma once
 #include "fbjq-common.hpp"
 
-constexpr int DEFAULT_MAX_FILES = 500;
-
 struct app_args_t
 {
-    int check_only{ 0 };
-    const char* cfg_file{ fbjqutil::DEFAULT_CONFIG_FILE };
-    int max_files{ DEFAULT_MAX_FILES };
+    int check_only = 0;
+    const char* cfg_file = fbjqutil::DEFAULT_CONFIG_FILE;
+    int max_files = 0;
 
     std::string string() {
         return std::format("check_only={}, cfg_file={}, max_files={}", check_only, cfg_file, max_files);

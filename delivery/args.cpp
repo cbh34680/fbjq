@@ -32,7 +32,7 @@ bool set_app_args(int argc, char** argv, app_args_t* app_args)
                 break;
 
             case 'n':
-                app_args->max_files = std::clamp(std::atoi(optarg), 1, 10000);
+                app_args->max_files = std::clamp(std::atoi(optarg), 0, INT_MAX);
                 break;
 
             case '?':

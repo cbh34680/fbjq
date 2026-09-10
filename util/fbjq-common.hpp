@@ -88,11 +88,11 @@ struct queue_item_view_t
 {
     // exec_user / allow_group は Setting の内部バッファを指す生ポインタ。
     // 取得元の Config が生きている短いスコープでのみ使用すること。
-    const char* exec_user{ nullptr };
-    const char* allow_group{ nullptr };
-    uid_t exec_user_uid{ static_cast<uid_t>(-1) };
-    gid_t allow_group_gid{ static_cast<gid_t>(-1) };
-    int max_process{ 1 };
+    const char* exec_user = nullptr;
+    const char* allow_group = nullptr;
+    uid_t exec_user_uid = static_cast<uid_t>(-1);
+    gid_t allow_group_gid = static_cast<gid_t>(-1);
+    int max_process = 1;
 };
 
 // util/util.cpp
@@ -139,8 +139,8 @@ static_assert(sizeof(request_file_header_t) == 256, "Header size must be 256 byt
 static_assert(std::is_trivially_copyable_v<request_file_header_t>, "Header must be trivial");
 
 // util/dirent.cpp
-int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path& target_dir,
-    const std::function<bool(const int, const std::filesystem::path&, const request_file_header_t*)>& on_regular_file);
+int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path& target_dir, const int max_files,
+    const std::function<bool(const std::filesystem::path&, const request_file_header_t*)>& on_regular_file);
 
 constexpr const char* REQUEST_FILE_EXT = ".req";
 
