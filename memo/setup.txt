@@ -19,3 +19,19 @@ root@guest:~/work/fbjq# cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 root@guest:~/work/fbjq# cmake --build build --verbose
 
 root@guest:~/work/fbjq# systemd-tmpfiles --create deploy/etc/tmpfiles.d/fbjq.conf
+
+
+
+/data/root/work/fbjq/build/debug/fs/fbjq-fs -c /data/root/work/fbjq/deploy/etc/fbjq.conf -f -d -o allow_other -o default_permissions -o fsname=fbjq-fs -o auto_unmount /run/fbjq
+/data/root/work/fbjq/build/debug/delivery/fbjq-delivery -c /data/root/work/fbjq/deploy/etc/fbjq.conf -n 10
+/data/root/work/fbjq/build/debug/executor/fbjq-executor -c /data/root/work/fbjq/deploy/etc/fbjq.conf -q alice
+
+
+root@guest:~/Desktop# code --list-extensions
+ms-ceintl.vscode-language-pack-ja
+ms-vscode.cmake-tools
+ms-vscode.cpp-devtools
+ms-vscode.cpptools-extension-pack
+ms-vscode.cpptools-themes
+ms-vscode.makefile-tools
+root@guest:~/Desktop#

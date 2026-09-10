@@ -1,7 +1,19 @@
 // util/util.cpp
 #include "fbjq-common.hpp"
+#include <numeric>
 
 namespace fbjqutil {
+
+std::string join_argv(int argc, char* argv[]) {
+    if (argc == 0) return "";
+
+    return std::accumulate(
+        argv + 1, argv + argc, std::string(argv[0]),
+        [](const std::string& a, const char* b) {
+            return a + " " + b;
+        }
+    );
+}
 
 // ナノ秒精度の Epoch タイムスタンプ
 std::int64_t now_nanos()

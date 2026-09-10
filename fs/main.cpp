@@ -61,7 +61,7 @@ int main_(int argc, char** argv)
 int main(int argc, char** argv)
 {
     ENTER_FUNCTION();
-
+    LOG_DEBUG("argv: {}", fbjqutil::join_argv(argc, argv));
     ::umask(0);
 
     const int rc = main_(argc, argv);

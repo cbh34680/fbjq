@@ -12,7 +12,13 @@
 struct app_args_t
 {
     int check_only{ 0 };
-    const char* cfg_file{ nullptr };
+    char* cfg_file{ nullptr };
+
+    ~app_args_t() {
+        if (cfg_file) {
+            ::free(cfg_file);
+        }
+    }
 
     std::string string() {
         return std::format("check_only={}, cfg_file={}", check_only, cfg_file);

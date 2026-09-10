@@ -17,7 +17,14 @@
 #include <sys/syscall.h>
 #include <libconfig.h++>
 
+#if defined(DEBUG)
+#include <mutex>
+inline std::mutex log_output_mtx_;
+#endif
+
 namespace fbjqutil {
+
+std::string join_argv(int argc, char* argv[]);
 
 struct [[nodiscard]] restore_errno_t_
 {
@@ -35,6 +42,10 @@ void log_impl(const char* level, std::ostream& os, const std::source_location& l
     std::format_string<Args...> fmt, Args&&... args)
 {
     restore_errno_t_ restore_errno_1__;
+
+#if defined(DEBUG)
+    std::lock_guard<std::mutex> lock_log_output_mtx_{ log_output_mtx_ };
+#endif
 
     try {
         char buf[1024];

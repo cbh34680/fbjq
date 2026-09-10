@@ -1,6 +1,11 @@
 // executor/local.hpp
 #pragma once
 #include "fbjq-common.hpp"
+#include <csignal>
+#include <atomic>
+#include <deque>
+#include <mutex>
+#include <semaphore.h>
 
 constexpr int DEFAULT_MAX_FILES = 50;
 
@@ -18,3 +23,6 @@ struct app_args_t
 };
 
 bool set_app_args(int argc, char** argv, app_args_t* app_args);
+int for_each_queue_file(sigset_t* sigset, const app_args_t* app_args, const libconfig::Config* app_cfg);
+
+void worker();

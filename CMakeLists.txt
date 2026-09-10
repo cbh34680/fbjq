@@ -5,9 +5,19 @@ project(fbjq CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Debug)
-endif()
+add_compile_options(
+    -Wall
+    -Wextra
+    -Wpedantic
+    -Wshadow
+    -Wconversion
+    $<$<CONFIG:Debug>:-fsanitize=address,leak,undefined>
+    $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
+)
+
+add_link_options(
+    $<$<CONFIG:Debug>:-fsanitize=address,leak,undefined>
+)
 
 find_package(PkgConfig REQUIRED)
 
@@ -66,6 +76,10 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/deploy/lib/systemd/system/
 #    DIRECTORY_PERMISSIONS ${STD_DIR_PERM}
 #)
 # == INSTALL SECTION <<==
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/a/CMakeLists.txt")
+    add_subdirectory(a)
+endif()
 
 add_subdirectory(util)
 add_subdirectory(fs)

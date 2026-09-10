@@ -4,7 +4,7 @@
         {
             "type": "shell",
             "label": "build-all",
-            "command": "cmake --build build/debug",
+            "command": "cmake --build --preset debug",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -15,8 +15,17 @@
         },
         {
             "type": "shell",
+            "label": "build-a",
+            "command": "cmake --build --preset debug --target a",
+            "group": "build",
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "type": "shell",
             "label": "build-fs",
-            "command": "cmake --build build/debug --target fbjq-fs",
+            "command": "cmake --build --preset debug --target fbjq-fs",
             "group": "build",
             "problemMatcher": [
                 "$gcc"
@@ -25,7 +34,7 @@
         {
             "type": "shell",
             "label": "build-delivery",
-            "command": "cmake --build build/debug --target fbjq-delivery",
+            "command": "cmake --build --preset debug --target fbjq-delivery",
             "group": "build",
             "problemMatcher": [
                 "$gcc"
@@ -34,7 +43,7 @@
         {
             "type": "shell",
             "label": "build-executor",
-            "command": "cmake --build build/debug --target fbjq-executor",
+            "command": "cmake --build --preset debug --target fbjq-executor",
             "group": "build",
             "problemMatcher": [
                 "$gcc"

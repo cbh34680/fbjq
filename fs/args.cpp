@@ -1,5 +1,6 @@
 // fs/args.cpp
 #include "local.hpp"
+#include <cstring>
 
 #define APP_OPT(t, p, v) { t, offsetof(struct app_args_t, p), v }
 
@@ -22,7 +23,11 @@ bool set_app_args(struct fuse_args* args, app_args_t* app_args)
     }
 
     if (! app_args->cfg_file) {
-        app_args->cfg_file = fbjqutil::DEFAULT_CONFIG_FILE;
+        app_args->cfg_file = ::strdup(fbjqutil::DEFAULT_CONFIG_FILE);
+        if (! app_args->cfg_file) {
+            LOG_ERROR("strdup");
+            return false;
+        }
     }
 
     return true;
