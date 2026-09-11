@@ -1,6 +1,5 @@
 // executor/local.hpp
 #pragma once
-#include <csignal>
 #include <deque>
 #include <filesystem>
 #include <format>
@@ -8,6 +7,7 @@
 #include <vector>
 #include <pthread.h>
 #include <semaphore.h>
+#include <signal.h>
 #include "fbjq-common.hpp"
 
 struct app_args_t

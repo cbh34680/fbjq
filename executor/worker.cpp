@@ -87,9 +87,7 @@ void* worker(void* param_) noexcept {
         LOG_ERROR("catch exception unknown");
     }
 
-    worker_param_t* param = static_cast<worker_param_t*>(param_);
-    LOG_DEBUG("release worker_slots");
-    ::sem_post(param->worker_slots);
+    ::kill(getpid(), SIGUSR1);
 
     return nullptr;
 }

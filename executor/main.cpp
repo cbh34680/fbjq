@@ -36,6 +36,7 @@ int main_(int argc, char** argv)
     ::sigemptyset(&sigset);
     ::sigaddset(&sigset, SIGINT);
     ::sigaddset(&sigset, SIGTERM);
+    ::sigaddset(&sigset, SIGUSR1);
 
     // メインスレッド（および今後生成される全スレッド）でシグナルをブロック
     // スレッドは、親スレッドの sigmask を継承するため、スレッド生成前に pthread_sigmask を呼ぶ

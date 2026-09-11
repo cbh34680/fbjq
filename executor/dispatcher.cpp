@@ -139,4 +139,7 @@ JobDispatcher::~JobDispatcher()
         ::free(worker_slots);
         worker_slots = nullptr;
     }
+
+    ::pthread_cond_destroy(&cond);
+    ::pthread_mutex_destroy(&mutex);
 }
