@@ -50,6 +50,8 @@ int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path&
         int fret = 0;
 
         for (const auto& entry_path: regfiles) {
+            bool ok = false;
+
             try {
                 std::ifstream ifs{ entry_path, std::ios::in | std::ios::binary };
                 if (! ifs) {
@@ -78,20 +80,23 @@ int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path&
                     break;
                 }
 
-                ++fret;
-
-                continue;
+                ok = true;
 
             } catch (const std::exception& ex) {
-                LOG_ERROR("exception: what={}", ex.what());
+                LOG_ERROR("catch exception what={}", ex.what());
 
             } catch (...) {
-                LOG_ERROR("exception: unknown");
+                LOG_ERROR("catch exception unknown");
             }
 
-            const auto newpath{ spool_dir / "dead" / entry_path.filename() };
-            LOG_INFO("move to newpath={}", newpath);
-            fs::rename(entry_path, newpath);
+            if (ok) {
+                ++fret;
+
+            } else {
+                const auto newpath{ spool_dir / "dead" / entry_path.filename() };
+                LOG_INFO("move to newpath={}", newpath);
+                fs::rename(entry_path, newpath);
+            }
         }
 
         return fret;

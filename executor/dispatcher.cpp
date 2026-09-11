@@ -42,6 +42,8 @@ bool JobDispatcher::dispatch(sigset_t* sigset, const std::filesystem::path& entr
             work_queue.emplace_back(std::make_unique<work_queue_item_t>(work_queue_item_t{
                 .entry_path = entry_path,
                 .rfhdr = *rfhdr,
+                .archive_dir = archive_dir,
+                .dead_dir = dead_dir,
             }));
 
             ::pthread_cond_signal(&cond);
@@ -90,7 +92,7 @@ std::unique_ptr<JobDispatcher> JobDispatcher::make(
             .mutex = &jd->mutex,
             .cond = &jd->cond,
             .work_queue = &jd->work_queue,
-            .terminate = &jd->terminate,
+            .term_requested = &jd->term_requested,
         }));
 
         pthread_t thrid;
@@ -120,7 +122,7 @@ JobDispatcher::~JobDispatcher()
 {
     {
         critical_section cs_{ &mutex };
-        terminate = true;
+        term_requested = true;
         LOG_DEBUG("send broadcast event");
         ::pthread_cond_broadcast(&cond);
     }

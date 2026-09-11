@@ -49,6 +49,8 @@ struct [[nodiscard]] critical_section {
 struct work_queue_item_t {
     std::filesystem::path entry_path;
     fbjqutil::request_file_header_t rfhdr;
+    std::filesystem::path archive_dir;
+    std::filesystem::path dead_dir;
 };
 
 struct worker_param_t
@@ -58,7 +60,7 @@ struct worker_param_t
     pthread_mutex_t* mutex = nullptr;
     pthread_cond_t* cond = nullptr;
     std::deque<std::unique_ptr<work_queue_item_t>>* work_queue = nullptr;
-    bool* terminate = nullptr;
+    bool* term_requested = nullptr;
 };
 
 class JobDispatcher
@@ -74,7 +76,7 @@ private:
     std::vector<std::unique_ptr<worker_param_t>> worker_params;
     std::vector<pthread_t> workers;
     std::deque<std::unique_ptr<work_queue_item_t>> work_queue;
-    bool terminate = false;
+    bool term_requested = false;
 
 public:
     JobDispatcher(const std::filesystem::path& arg_archive_dir, const std::filesystem::path& arg_dead_dir)
@@ -94,4 +96,4 @@ public:
         const fbjqutil::request_file_header_t* rfhdr);
 };
 
-void* worker(void* param_) ;
+void* worker(void* param_) noexcept;

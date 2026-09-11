@@ -32,6 +32,11 @@ bool get_queue_item_internal(const libconfig::Setting &q_item, fbjqutil::queue_i
         return false;
     }
 
+    const char* exec_group = nullptr;
+    if (! q_item.lookupValue("exec_group", exec_group)) {
+        LOG_WARN("exec_group: no key");
+    }
+
     const char* allow_group = nullptr;
     if (! q_item.lookupValue("allow_group", allow_group)) {
         LOG_ERROR("allow_group: no key");
@@ -56,6 +61,14 @@ bool get_queue_item_internal(const libconfig::Setting &q_item, fbjqutil::queue_i
         return false;
     }
 
+    gid_t exec_group_gid = fbjqutil::EXEC_GROUP_NO_CHANGE;
+    if (exec_group) {
+        if (! fbjqutil::get_gid_by_name(exec_group, &exec_group_gid)) {
+            LOG_ERROR("get_gid_by_name");
+            return false;
+        }
+    }
+
     gid_t allow_group_gid;
     if (! fbjqutil::get_gid_by_name(allow_group, &allow_group_gid)) {
         LOG_ERROR("get_gid_by_name");
@@ -64,8 +77,10 @@ bool get_queue_item_internal(const libconfig::Setting &q_item, fbjqutil::queue_i
 
     if (out) {
         out->exec_user= exec_user;
+        out->exec_group= exec_group;
         out->allow_group = allow_group;
         out->exec_user_uid = exec_user_uid;
+        out->exec_group_gid = exec_group_gid;
         out->allow_group_gid = allow_group_gid;
         out->max_process = max_process;
     }
@@ -122,11 +137,11 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
         return nullptr;
 
     }*/ catch (const std::exception& ex) {
-        LOG_ERROR("exception what={}", ex.what());
+        LOG_ERROR("catch exception what={}", ex.what());
         return nullptr;
 
     } catch (...) {
-        LOG_ERROR("unknown");
+        LOG_ERROR("catch exception unknown");
         return nullptr;
     }
 

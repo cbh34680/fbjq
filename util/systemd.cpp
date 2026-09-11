@@ -76,11 +76,11 @@ bool systemd_unit_method(const std::string& unit_name, const char* method)
         return false;
 
     }*/ catch (const std::exception& ex) {
-        LOG_ERROR("exception what={}", ex.what());
+        LOG_ERROR("catch exception what={}", ex.what());
         return false;
 
     } catch (...) {
-        LOG_ERROR("exception unknown");
+        LOG_ERROR("unknown exception");
         return false;
     }
 }

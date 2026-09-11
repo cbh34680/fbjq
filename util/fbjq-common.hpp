@@ -84,13 +84,17 @@ constexpr int VERSION_MAXLEN = 11;
 constexpr int QUEUE_NAME_MAXLEN = 63;
 constexpr int QUEUE_MAX_PROCESS = 32;
 
+constexpr gid_t EXEC_GROUP_NO_CHANGE = static_cast<gid_t>(-1);
+
 struct queue_item_view_t
 {
     // exec_user / allow_group は Setting の内部バッファを指す生ポインタ。
     // 取得元の Config が生きている短いスコープでのみ使用すること。
     const char* exec_user = nullptr;
+    const char* exec_group = nullptr;                   // nullable
     const char* allow_group = nullptr;
     uid_t exec_user_uid = static_cast<uid_t>(-1);
+    uid_t exec_group_gid = static_cast<uid_t>(-1);
     gid_t allow_group_gid = static_cast<gid_t>(-1);
     int max_process = 1;
 };
@@ -131,10 +135,10 @@ struct request_file_header_t
     std::int32_t fuse_pid;
     std::int32_t fuse_tid;
     std::uint32_t exec_user_uid;
-    std::uint32_t allow_group_gid;
-    char padding1[4];                       // 64
+    std::uint32_t exec_group_gid;
+    std::uint32_t allow_group_gid;          // 64
     char q_name[QUEUE_NAME_MAXLEN + 1];     // 128
-    char padding2[128];
+    char padding1[128];
 };
 
 static_assert(sizeof(request_file_header_t) == 256, "Header size must be 256 bytes");
@@ -162,6 +166,8 @@ struct std::formatter<std::filesystem::path> {
 };
 
 #define LOG_ERROR(...) fbjqutil::log_impl("ERR", std::cerr, std::source_location::current(), __VA_ARGS__)
+
+#define LOG_WARN(...) fbjqutil::log_impl("WRN", std::cerr, std::source_location::current(), __VA_ARGS__)
 
 #define LOG_INFO(...) fbjqutil::log_impl("INF", std::cout, std::source_location::current(), __VA_ARGS__)
 

@@ -142,7 +142,7 @@ int fbjq_open(const char *path, struct fuse_file_info *fi)
     const auto filename_seq = sequence.fetch_add(1, std::memory_order_relaxed);
 
     char outpath[PATH_MAX];
-    std::snprintf(outpath, sizeof(outpath), "%s/tmp/%" PRId64 "-%" PRIu64 "%s",
+    std::snprintf(outpath, sizeof(outpath), "%s/tmp/%020" PRId64 "-%020" PRIu64 "%s",
         APP_CTX()->spool_dir.c_str(), filename_ns, filename_seq, fbjqutil::REQUEST_FILE_EXT);
 
     const struct fuse_context* fuse_ctx = fuse_get_context();
@@ -159,10 +159,10 @@ int fbjq_open(const char *path, struct fuse_file_info *fi)
         .fuse_pid           = static_cast<int32_t>(::getpid()),
         .fuse_tid           = static_cast<int32_t>(fbjqutil::getthrid()),
         .exec_user_uid      = static_cast<uint32_t>(q_item.exec_user_uid),
+        .exec_group_gid     = static_cast<uint32_t>(q_item.exec_group_gid),
         .allow_group_gid    = static_cast<uint32_t>(q_item.allow_group_gid),
-        .padding1           = { '\0' },
         .q_name             = { '\0' },
-        .padding2           = { '\0' },
+        .padding1           = { '\0' },
     };
 
     ::strncpy(rfhdr.version, cfg_version, sizeof(rfhdr.version));
