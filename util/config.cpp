@@ -1,9 +1,9 @@
 // util/config.cpp
-#include "fbjq-common.hpp"
 #include <cstring>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include "fbjq-common.hpp"
 
 namespace {
 
@@ -225,7 +225,7 @@ bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_
     return true;
 }
 
-int for_each_queue_item(const libconfig::Config* app_cfg, const std::function<bool(const char*, const queue_item_view_t&)>& callback)
+int for_each_queue_item(const libconfig::Config* app_cfg, const for_each_queue_item_callback_t& callback)
 {
     ENTER_FUNCTION();
 

@@ -1,4 +1,4 @@
-// executor/worker.cpp
+// executor/dirent.cpp
 #include "local.hpp"
 
 int for_each_queue_file(const app_args_t* app_args, const libconfig::Config* app_cfg, sigset_t* sigset)
@@ -18,20 +18,12 @@ int for_each_queue_file(const app_args_t* app_args, const libconfig::Config* app
     const fs::path archive_dir{ spool_dir / "archive" };
     const fs::path dead_dir{ spool_dir / "dead" };
 
-    auto jd{ JobDispatcher::make(sigset, max_process) };
+    auto jd{ JobDispatcher::make(archive_dir, dead_dir, max_process) };
 
     const auto on_regular_file = [&](const auto& entry_path, const auto* rfhdr) -> bool {
-        bool success = rfhdr
-            ? jd->dispatch(entry_path, rfhdr, archive_dir)
-            : false;
 
-        if (! success) {
-            const auto newpath{ dead_dir / entry_path.filename() };
-            LOG_INFO("move to {}", newpath);
-            fs::rename(entry_path, newpath);
-        }
-
-        return true;
+        LOG_DEBUG("dispatch entry_path={}", entry_path);
+        return jd->dispatch(sigset, entry_path, rfhdr);
     };
 
     const auto q_name_dir{ spool_dir / "queue" / app_args->q_name };

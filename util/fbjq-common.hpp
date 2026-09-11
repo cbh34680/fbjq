@@ -104,7 +104,9 @@ bool get_gid_by_name(const char* group_name, gid_t* out_gid);
 // util/config.cpp
 std::unique_ptr<libconfig::Config> load_config(const char* cfg_file);
 bool get_queue_item(const libconfig::Config* app_cfg, const char* q_name, queue_item_view_t* queue_item);
-int for_each_queue_item(const libconfig::Config* app_cfg, const std::function<bool(const char* q_name, const queue_item_view_t& q_item)>& callback);
+
+using for_each_queue_item_callback_t = std::function<bool(const char* q_name, const queue_item_view_t& q_item)>;
+int for_each_queue_item(const libconfig::Config* app_cfg, const for_each_queue_item_callback_t& callback);
 
 // util/systemd.cpp
 bool systemd_unit_method(const std::string& unit_name, const char* method);
@@ -139,8 +141,10 @@ static_assert(sizeof(request_file_header_t) == 256, "Header size must be 256 byt
 static_assert(std::is_trivially_copyable_v<request_file_header_t>, "Header must be trivial");
 
 // util/dirent.cpp
-int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path& target_dir, const int max_files,
-    const std::function<bool(const std::filesystem::path&, const request_file_header_t*)>& on_regular_file);
+using for_each_file_callback_t = std::function<bool(const std::filesystem::path&, const request_file_header_t*)>;
+
+int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path& target_dir,
+    const int max_files, const for_each_file_callback_t& on_regular_file);
 
 constexpr const char* REQUEST_FILE_EXT = ".req";
 

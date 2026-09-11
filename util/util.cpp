@@ -1,6 +1,6 @@
 // util/util.cpp
-#include "fbjq-common.hpp"
 #include <numeric>
+#include "fbjq-common.hpp"
 
 namespace fbjqutil {
 

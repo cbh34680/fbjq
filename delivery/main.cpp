@@ -62,7 +62,6 @@ int main_(int argc, char** argv)
     LOG_DEBUG("spool_dir={}", spool_dir);
 
     const fs::path queue_dir{ spool_dir / "queue" };
-    const fs::path dead_dir{ spool_dir / "dead" };
 
     const auto on_regular_file = [&](const auto& entry_path, const auto* rfhdr) -> bool {
         if (g_graceful_stop) {
@@ -70,7 +69,8 @@ int main_(int argc, char** argv)
             return false;
         }
 
-        const auto newpath = (rfhdr ? queue_dir / rfhdr->q_name : dead_dir) / entry_path.filename();
+        const auto newpath = queue_dir / rfhdr->q_name / entry_path.filename();
+        LOG_DEBUG("move to newpath={}", newpath);
         fs::rename(entry_path, newpath);
 
         return true;

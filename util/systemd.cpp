@@ -1,6 +1,6 @@
 // util/systemd.cpp
-#include "fbjq-common.hpp"
 #include <sdbus-c++/sdbus-c++.h>
+#include "fbjq-common.hpp"
 
 #define AUTO_WAIT (1)
 

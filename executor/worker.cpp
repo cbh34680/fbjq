@@ -1,3 +1,4 @@
+// executor/worker.cpp
 #include "local.hpp"
 #include <fstream>
 
@@ -10,10 +11,12 @@ void* worker_(void* param_) {
     LOG_DEBUG("worker[{}] enter", worker_no);
 
     while (1) {
-        {
-            lock_mutex lock{ param->mutex };
+        std::unique_ptr<work_queue_item_t> wq_item;
 
-            while (param->data_queue->empty() && ! *param->terminate) {
+        {
+            critical_section cs_{ param->mutex };
+
+            while (param->work_queue->empty() && ! *param->terminate) {
                 LOG_DEBUG("worker[{}] wait for event ...", worker_no);
                 ::pthread_cond_wait(param->cond, param->mutex);
                 LOG_DEBUG("worker[{}] receive event", worker_no);
@@ -24,9 +27,14 @@ void* worker_(void* param_) {
                 break;
             }
 
-            //data = std::move(param->data_queue->front());
-            //param->data_queue->pop_front();
+            wq_item = std::move(param->work_queue->front());
+            param->work_queue->pop_front();
         }
+
+        LOG_DEBUG("worker[{}] PROCESS entry_path={}", worker_no, wq_item->entry_path);
+
+        LOG_DEBUG("worker[{}] release worker_slots", worker_no);
+        ::sem_post(param->worker_slots);
     }
 
     LOG_DEBUG("worker[{}] leave", worker_no);
@@ -46,6 +54,10 @@ void* worker(void* param_) {
     } catch (...) {
         LOG_ERROR("catch unknown error");
     }
+
+    worker_param_t* param = static_cast<worker_param_t*>(param_);
+    LOG_DEBUG("release worker_slots");
+    ::sem_post(param->worker_slots);
 
     return nullptr;
 }

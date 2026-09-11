@@ -1,13 +1,69 @@
+// executor/dispatcher.cpp
 #include "local.hpp"
 
-std::unique_ptr<JobDispatcher> JobDispatcher::make(sigset_t* sigset, int max_process)
+bool JobDispatcher::dispatch(sigset_t* sigset, const std::filesystem::path& entry_path,
+    const fbjqutil::request_file_header_t* rfhdr)
+{
+    LOG_DEBUG("dispatch entry_path={}", entry_path);
+
+    while (1) {
+        LOG_DEBUG("Waiting for a worker to become available ...");
+
+        struct timespec timeout5s;
+        if (::clock_gettime(CLOCK_REALTIME, &timeout5s) == -1) {
+            LOG_ERROR("clock_gettime");
+            return false;
+        }
+
+        timeout5s.tv_sec += 5;
+
+        const auto semrc = TEMP_FAILURE_RETRY(::sem_timedwait(worker_slots, &timeout5s));
+        const auto semec = errno;
+
+        const struct timespec timeout0s{};
+        const auto signo = ::sigtimedwait(sigset, nullptr, &timeout0s);
+        if (signo > 0) {
+            LOG_INFO("Signal received signo={}, send terminate to all workers", signo);
+            return false;
+        }
+
+        // no signal
+
+        if (semec == EINVAL) {
+            LOG_ERROR("sem_timedwait");
+            return false;
+        }
+
+        if (semrc == 0) {
+            // exist free-worker
+
+            critical_section lock{ &mutex };
+
+            work_queue.emplace_back(std::make_unique<work_queue_item_t>(work_queue_item_t{
+                .entry_path = entry_path,
+                .rfhdr = *rfhdr,
+            }));
+
+            ::pthread_cond_signal(&cond);
+
+            break;
+        }
+
+        LOG_DEBUG("Time's up.");
+    }
+
+    return true;
+}
+
+std::unique_ptr<JobDispatcher> JobDispatcher::make(
+    const std::filesystem::path& archive_dir, const std::filesystem::path& dead_dir,
+    int max_process)
 {
     bool success = false;
 
-    LOG_DEBUG("new JobDispatcher");
-    JobDispatcher* jd = new JobDispatcher{};
+    LOG_DEBUG("new JobDispatcher archive_dir={} dead_dir={}", archive_dir, dead_dir);
+    JobDispatcher* jd = new JobDispatcher{ archive_dir, dead_dir };
 
-    jd->sigset = sigset;
     jd->worker_slots = static_cast<sem_t*>(::malloc(sizeof(sem_t)));
     if (! jd->worker_slots) {
         LOG_ERROR("malloc");
@@ -23,7 +79,7 @@ std::unique_ptr<JobDispatcher> JobDispatcher::make(sigset_t* sigset, int max_pro
     }
 
     jd->worker_params.reserve(max_process);
-    jd->worker_ids.reserve(max_process);
+    jd->workers.reserve(max_process);
 
     for (int i=0; i<max_process; ++i) {
         LOG_DEBUG("create worker[{}]", i);
@@ -33,18 +89,17 @@ std::unique_ptr<JobDispatcher> JobDispatcher::make(sigset_t* sigset, int max_pro
             .worker_slots = jd->worker_slots,
             .mutex = &jd->mutex,
             .cond = &jd->cond,
-            .data_queue = &jd->data_queue,
+            .work_queue = &jd->work_queue,
             .terminate = &jd->terminate,
         }));
 
-        pthread_t worker_id;
-
-        if (::pthread_create(&worker_id, nullptr, worker, param.get()) != 0) {
+        pthread_t thrid;
+        if (::pthread_create(&thrid, nullptr, worker, param.get()) != 0) {
             LOG_ERROR("pthread_create i={}", i);
             goto EXIT_LABEL;
         }
 
-        jd->worker_ids.push_back(worker_id);
+        jd->workers.push_back(thrid);
     }
 
     LOG_DEBUG("initialize done");
@@ -61,24 +116,18 @@ EXIT_LABEL:
     return std::unique_ptr<JobDispatcher>(jd);
 }
 
-bool JobDispatcher::dispatch(const std::filesystem::path& entry_path,
-        const fbjqutil::request_file_header_t* rfhdr, const std::filesystem::path& archive_dir)
-{
-    return false;
-}
-
 JobDispatcher::~JobDispatcher()
 {
     {
-        lock_mutex lock{ &mutex };
+        critical_section cs_{ &mutex };
         terminate = true;
         LOG_DEBUG("send broadcast event");
         ::pthread_cond_broadcast(&cond);
     }
 
-    for (size_t i=0; i<worker_ids.size(); ++i) {
+    for (size_t i=0; i<workers.size(); ++i) {
         LOG_DEBUG("wait for worker[{}] terminate ...", i);
-        ::pthread_join(worker_ids[i], nullptr);
+        ::pthread_join(workers[i], nullptr);
         LOG_DEBUG("worker[{}] terminated", i);
     }
 
