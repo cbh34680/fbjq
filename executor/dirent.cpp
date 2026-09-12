@@ -1,29 +1,25 @@
 // executor/dirent.cpp
 #include "local.hpp"
 
-int for_each_queue_file(const app_args_t* app_args, const libconfig::Config* app_cfg, sigset_t* sigset)
+int for_each_queue_file(const app_args_t* app_args,
+    const libconfig::Config* app_cfg,sigset_t* sigset, const int max_process)
 {
     namespace fs = std::filesystem;
-
-    // create thread-pool
-    int max_process = 1;
-
-    if (! app_cfg->lookupValue(std::format("queue.{}.max_process", app_args->q_name), max_process)) {
-        LOG_INFO("queue.{}.max_process: invalid value, set default({})", app_args->q_name, max_process);
-    }
+    ENTER_FUNCTION();
 
     const fs::path spool_dir{ app_cfg->lookup("spool_dir").c_str() };
     LOG_DEBUG("spool_dir={}", spool_dir);
 
-    const fs::path archive_dir{ spool_dir / "archive" };
-    const fs::path dead_dir{ spool_dir / "dead" };
+    auto jd{ JobDispatcher::make(sigset, spool_dir, max_process) };
+    if (! jd) {
+        LOG_ERROR("JobDispatcher::make");
+        return EXIT_FAILURE;
+    }
 
-    auto jd{ JobDispatcher::make(archive_dir, dead_dir, max_process) };
-
-    const auto on_regular_file = [&](const auto& entry_path, const auto* rfhdr) -> bool {
-
+    const auto on_regular_file = [&](const auto& entry_path, const auto* rfhdr) -> fbjqutil::OnRegularFileResult {
         LOG_DEBUG("dispatch entry_path={}", entry_path);
-        return jd->dispatch(sigset, entry_path, rfhdr);
+
+        return jd->dispatch(entry_path, rfhdr);
     };
 
     const auto q_name_dir{ spool_dir / "queue" / app_args->q_name };

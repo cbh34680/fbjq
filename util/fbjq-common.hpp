@@ -145,7 +145,13 @@ static_assert(sizeof(request_file_header_t) == 256, "Header size must be 256 byt
 static_assert(std::is_trivially_copyable_v<request_file_header_t>, "Header must be trivial");
 
 // util/dirent.cpp
-using for_each_file_callback_t = std::function<bool(const std::filesystem::path&, const request_file_header_t*)>;
+enum class OnRegularFileResult {
+    Continue,
+    Break,
+    Error,
+};
+
+using for_each_file_callback_t = std::function<OnRegularFileResult(const std::filesystem::path&, const request_file_header_t*)>;
 
 int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path& target_dir,
     const int max_files, const for_each_file_callback_t& on_regular_file);

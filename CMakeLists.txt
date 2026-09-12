@@ -15,6 +15,12 @@ add_compile_options(
     $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
 )
 
+add_compile_definitions(
+    $<$<CONFIG:Debug>:DEBUG>
+    _FILE_OFFSET_BITS=64
+    _GNU_SOURCE
+)
+
 add_link_options(
     $<$<CONFIG:Debug>:-fsanitize=address,leak,undefined>
 )

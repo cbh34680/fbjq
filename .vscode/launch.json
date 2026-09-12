@@ -87,7 +87,6 @@
             "program": "${workspaceFolder}/build/debug/delivery/fbjq-delivery",
             "args": [
                 "-c", "${workspaceFolder}/deploy/etc/fbjq.conf",
-                "-n", "10"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

@@ -63,17 +63,17 @@ int main_(int argc, char** argv)
 
     const fs::path queue_dir{ spool_dir / "queue" };
 
-    const auto on_regular_file = [&](const auto& entry_path, const auto* rfhdr) -> bool {
+    const auto on_regular_file = [&](const auto& entry_path, const auto* rfhdr) -> fbjqutil::OnRegularFileResult {
         if (g_graceful_stop) {
             LOG_INFO("receive signal, graceful stop");
-            return false;
+            return fbjqutil::OnRegularFileResult::Break;
         }
 
         const auto newpath = queue_dir / rfhdr->q_name / entry_path.filename();
         LOG_DEBUG("move to newpath={}", newpath);
         fs::rename(entry_path, newpath);
 
-        return true;
+        return fbjqutil::OnRegularFileResult::Continue;
     };
 
     const auto delivery_dir{ spool_dir / "delivery" };

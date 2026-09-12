@@ -51,7 +51,7 @@ int main_(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    return for_each_queue_file(&app_args, app_cfg, &sigset);
+    return for_each_queue_file(&app_args, app_cfg, &sigset, queue_item.max_process);
 }
 
 } // namespace

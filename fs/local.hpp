@@ -19,7 +19,7 @@ struct app_args_t
         }
     }
 
-    std::string string() {
+    std::string string() const {
         return std::format("check_only={}, cfg_file={}", check_only, cfg_file);
     }
 };

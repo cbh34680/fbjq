@@ -1,11 +1,11 @@
 # executor/CMakeLists.txt
 add_executable(fbjq-executor main.cpp args.cpp dirent.cpp dispatcher.cpp worker.cpp)
 
-target_compile_definitions(fbjq-executor PRIVATE
-    $<$<CONFIG:Debug>:DEBUG>
-    _FILE_OFFSET_BITS=64
-    _GNU_SOURCE
-)
+#target_compile_definitions(fbjq-executor PRIVATE
+#    $<$<CONFIG:Debug>:DEBUG>
+#    _FILE_OFFSET_BITS=64
+#    _GNU_SOURCE
+#)
 
 # Threads
 find_package(Threads REQUIRED)

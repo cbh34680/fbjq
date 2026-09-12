@@ -75,7 +75,13 @@ int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path&
                     throw std::runtime_error(std::format("{}: get_queue_item", entry_path));
                 }
 
-                if (! on_regular_file(entry_path, &rfhdr)) {
+                const auto result = on_regular_file(entry_path, &rfhdr);
+
+                if (result == fbjqutil::OnRegularFileResult::Error) {
+                    LOG_INFO("{}: Callback processing failed.", entry_path);
+                    return -1;
+
+                } else if (result == fbjqutil::OnRegularFileResult::Break) {
                     LOG_INFO("{}: The callback refused the continuation.", entry_path);
                     break;
                 }
@@ -97,7 +103,7 @@ int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path&
                 LOG_INFO("move to newpath={}", newpath);
                 fs::rename(entry_path, newpath);
             }
-        }
+        } // for
 
         return fret;
 

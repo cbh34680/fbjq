@@ -8,7 +8,7 @@ struct app_args_t
     const char* cfg_file = fbjqutil::DEFAULT_CONFIG_FILE;
     int max_files = 0;
 
-    std::string string() {
+    std::string string() const {
         return std::format("check_only={}, cfg_file={}, max_files={}", check_only, cfg_file, max_files);
     }
 };

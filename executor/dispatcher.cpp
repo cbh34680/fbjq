@@ -1,103 +1,184 @@
 // executor/dispatcher.cpp
 #include "local.hpp"
 
-bool JobDispatcher::dispatch(sigset_t* sigset, const std::filesystem::path& entry_path,
+bool JobDispatcher::dispatch_internal(const std::filesystem::path& entry_path,
     const fbjqutil::request_file_header_t* rfhdr)
 {
-    LOG_DEBUG("dispatch entry_path={}", entry_path);
+    ENTER_FUNCTION();
 
-    while (1) {
-        LOG_DEBUG("Waiting for a worker to become available ...");
+    struct epoll_event events[16];
+    bool cont = true;
 
-        struct timespec timeout5s;
-        if (::clock_gettime(CLOCK_REALTIME, &timeout5s) == -1) {
-            LOG_ERROR("clock_gettime");
-            return false;
+    do
+    {
+        const auto nfds = TEMP_FAILURE_RETRY(::epoll_wait(epoll_fd, events, std::size(events), -1));
+        if (nfds == -1) {
+            throw std::runtime_error("epoll_wait");
         }
 
-        timeout5s.tv_sec += 5;
+        for (int i=0; i<static_cast<int>(nfds); i++) {
+            const auto* event = &events[i];
 
-        const auto semrc = TEMP_FAILURE_RETRY(::sem_timedwait(worker_slots, &timeout5s));
-        const auto semec = errno;
+            if (event->events & (EPOLLERR | EPOLLHUP)) {
+                throw std::runtime_error("!EPOLLERR/EPOLLHUP");
+            }
 
-        const struct timespec timeout0s{};
-        const auto signo = ::sigtimedwait(sigset, nullptr, &timeout0s);
-        if (signo > 0) {
-            LOG_INFO("Signal received signo={}, send terminate to all workers", signo);
-            return false;
+            if (! (event->events & EPOLLIN)) {
+                throw std::runtime_error("!EPOLLIN");
+            }
+
+            if (event->data.fd == sem_fd) {
+                LOG_DEBUG("found free-worker");
+
+                uint64_t count;
+                const auto s = TEMP_FAILURE_RETRY(::read(sem_fd, &count, sizeof(count)));
+
+                if (s > 0) {
+                    critical_section cs_{ &mutex };
+
+                    work_queue.emplace_back(std::make_unique<work_queue_item_t>(work_queue_item_t{
+                        .entry_path = entry_path,
+                        .rfhdr = *rfhdr,
+                    }));
+
+                    LOG_DEBUG("notify entry_path={}", entry_path);
+                    ::pthread_cond_signal(&cond);
+
+                    cont = false;
+
+                } else if (s == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                    // continue
+                    LOG_DEBUG("retry");
+
+                } else {
+                    throw std::runtime_error(std::format("read s={}", s));
+                }
+
+            } else if (event->data.fd == sig_fd) {
+                LOG_DEBUG("catch signal");
+
+                struct signalfd_siginfo fdsi;
+                const auto s = TEMP_FAILURE_RETRY(::read(sig_fd, &fdsi, sizeof(fdsi)));
+
+                if (s == sizeof(fdsi)) {
+                    if (fdsi.ssi_signo == SIGTERM || fdsi.ssi_signo == SIGINT) {
+                        LOG_INFO("Received signo={}", fdsi.ssi_signo);
+                        return false;
+
+                    } else {
+                        throw std::runtime_error(std::format("Received signo={}", fdsi.ssi_signo));
+                    }
+
+                } else if (s == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                    // continue
+                    LOG_DEBUG("retry");
+
+                } else {
+                    throw std::runtime_error(std::format("read s={}", s));
+                }
+
+            } else {
+                throw std::runtime_error(std::format("fd={}", event->data.fd));
+            }
         }
+    } while (cont);
 
-        // no signal
-
-        if (semec == EINVAL) {
-            LOG_ERROR("sem_timedwait");
-            return false;
-        }
-
-        if (semrc == 0) {
-            // exist free-worker
-
-            critical_section lock{ &mutex };
-
-            work_queue.emplace_back(std::make_unique<work_queue_item_t>(work_queue_item_t{
-                .entry_path = entry_path,
-                .rfhdr = *rfhdr,
-                .archive_dir = archive_dir,
-                .dead_dir = dead_dir,
-            }));
-
-            ::pthread_cond_signal(&cond);
-
-            break;
-        }
-
-        LOG_DEBUG("Time's up.");
-    }
+    LOG_DEBUG("dispatch done");
 
     return true;
 }
 
-std::unique_ptr<JobDispatcher> JobDispatcher::make(
-    const std::filesystem::path& archive_dir, const std::filesystem::path& dead_dir,
-    int max_process)
+fbjqutil::OnRegularFileResult JobDispatcher::dispatch(const std::filesystem::path& entry_path,
+    const fbjqutil::request_file_header_t* rfhdr)
 {
+    try {
+        return dispatch_internal(entry_path, rfhdr)
+            ? fbjqutil::OnRegularFileResult::Continue
+            : fbjqutil::OnRegularFileResult::Break;
+
+
+    } catch (const std::exception& ex) {
+        LOG_ERROR("catch exception what={}", ex.what());
+
+    } catch (...) {
+        LOG_ERROR("catch exception unknown");
+    }
+
+    {
+        critical_section cs_{ &mutex };
+
+        LOG_DEBUG("set term_immediate");
+        term_immediate = true;
+    }
+
+    return fbjqutil::OnRegularFileResult::Error;
+}
+
+std::unique_ptr<JobDispatcher> JobDispatcher::make(sigset_t* sigset,
+    const std::filesystem::path& spool_dir, int max_process)
+{
+    ENTER_FUNCTION();
     bool success = false;
 
-    LOG_DEBUG("new JobDispatcher archive_dir={} dead_dir={}", archive_dir, dead_dir);
-    JobDispatcher* jd = new JobDispatcher{ archive_dir, dead_dir };
+    LOG_DEBUG("new JobDispatcher spool_dir={}", spool_dir);
+    std::unique_ptr<JobDispatcher> jd = std::make_unique<JobDispatcher>(spool_dir);
+    struct epoll_event ev{};
 
-    jd->worker_slots = static_cast<sem_t*>(::malloc(sizeof(sem_t)));
-    if (! jd->worker_slots) {
-        LOG_ERROR("malloc");
+    jd->sig_fd = ::signalfd(-1, sigset, SFD_CLOEXEC | SFD_NONBLOCK);
+    if (jd->sig_fd == -1) {
+        LOG_ERROR("signalfd");
         goto EXIT_LABEL;
     }
 
-    if (::sem_init(jd->worker_slots, 0, max_process) != 0) {
-        ::free(jd->worker_slots);
-        jd->worker_slots = nullptr;
-
-        LOG_ERROR("sem_init");
+    jd->sem_fd = ::eventfd(max_process, EFD_CLOEXEC | EFD_NONBLOCK | EFD_SEMAPHORE);
+    if (jd->sem_fd == -1) {
+        LOG_ERROR("eventfd");
         goto EXIT_LABEL;
     }
 
-    jd->worker_params.reserve(max_process);
+    jd->epoll_fd = ::epoll_create1(EPOLL_CLOEXEC);
+    if (jd->epoll_fd == -1) {
+        LOG_ERROR("epoll_create1");
+        goto EXIT_LABEL;
+    }
+
+    ev.events = EPOLLIN;
+    ev.data.fd = jd->sig_fd;
+    if (::epoll_ctl(jd->epoll_fd, EPOLL_CTL_ADD, jd->sig_fd, &ev) != 0) {
+        LOG_ERROR("epoll_ctl sig_fd");
+        goto EXIT_LABEL;
+    }
+
+    ev.events = EPOLLIN;
+    ev.data.fd = jd->sem_fd;
+    if (::epoll_ctl(jd->epoll_fd, EPOLL_CTL_ADD, jd->sem_fd, &ev) != 0) {
+        LOG_ERROR("epoll_ctl sem_fd");
+        goto EXIT_LABEL;
+    }
+
+    jd->worker_params.resize(max_process);
     jd->workers.reserve(max_process);
 
     for (int i=0; i<max_process; ++i) {
-        LOG_DEBUG("create worker[{}]", i);
+        LOG_DEBUG("set worker-params[{}]", i);
 
-        auto& param = jd->worker_params.emplace_back(std::make_unique<worker_param_t>(worker_param_t{
-            .id = i,
-            .worker_slots = jd->worker_slots,
-            .mutex = &jd->mutex,
-            .cond = &jd->cond,
-            .work_queue = &jd->work_queue,
-            .term_requested = &jd->term_requested,
-        }));
+        auto& param = jd->worker_params[i];
 
+        param.id = i;
+        param.sem_fd = jd->sem_fd;
+        param.mutex = &jd->mutex;
+        param.cond = &jd->cond;
+        param.work_queue = &jd->work_queue;
+        param.term_requested = &jd->term_requested;
+        param.term_immediate = &jd->term_immediate;
+        param.spool_dir = jd->spool_dir;
+    }
+
+    for (auto& param: jd->worker_params) {
         pthread_t thrid;
-        if (::pthread_create(&thrid, nullptr, worker, param.get()) != 0) {
-            LOG_ERROR("pthread_create i={}", i);
+
+        if (::pthread_create(&thrid, nullptr, worker, &param) != 0) {
+            LOG_ERROR("pthread_create id={}", param.id);
             goto EXIT_LABEL;
         }
 
@@ -111,15 +192,16 @@ std::unique_ptr<JobDispatcher> JobDispatcher::make(
 EXIT_LABEL:
     if (! success) {
         LOG_DEBUG("initialize error");
-        delete jd;
-        jd = nullptr;
+        return nullptr;
     }
 
-    return std::unique_ptr<JobDispatcher>(jd);
+    return jd;
 }
 
 JobDispatcher::~JobDispatcher()
 {
+    ENTER_FUNCTION();
+
     {
         critical_section cs_{ &mutex };
         term_requested = true;
@@ -133,11 +215,19 @@ JobDispatcher::~JobDispatcher()
         LOG_DEBUG("worker[{}] terminated", i);
     }
 
-    if (worker_slots) {
-        LOG_DEBUG("destroy semaphore");
-        ::sem_destroy(worker_slots);
-        ::free(worker_slots);
-        worker_slots = nullptr;
+    if (epoll_fd != -1) {
+        ::close(epoll_fd);
+        epoll_fd = -1;
+    }
+
+    if (sem_fd != -1) {
+        ::close(sem_fd);
+        sem_fd = -1;
+    }
+
+    if (sig_fd != -1) {
+        ::close(sig_fd);
+        sig_fd = -1;
     }
 
     ::pthread_cond_destroy(&cond);

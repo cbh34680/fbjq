@@ -1,11 +1,11 @@
 # delivery/CMakeLists.txt
 add_executable(fbjq-delivery main.cpp args.cpp)
 
-target_compile_definitions(fbjq-delivery PRIVATE
-    $<$<CONFIG:Debug>:DEBUG>
-    _FILE_OFFSET_BITS=64
-    _GNU_SOURCE
-)
+#target_compile_definitions(fbjq-delivery PRIVATE
+#    $<$<CONFIG:Debug>:DEBUG>
+#    _FILE_OFFSET_BITS=64
+#    _GNU_SOURCE
+#)
 
 # fbjq-util
 target_link_libraries(fbjq-delivery PRIVATE fbjq-util)

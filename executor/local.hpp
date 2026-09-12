@@ -6,8 +6,10 @@
 #include <memory>
 #include <vector>
 #include <pthread.h>
-#include <semaphore.h>
 #include <signal.h>
+#include <sys/epoll.h>
+#include <sys/eventfd.h>
+#include <sys/signalfd.h>
 #include "fbjq-common.hpp"
 
 struct app_args_t
@@ -17,14 +19,14 @@ struct app_args_t
     int max_files = 0;
     const char* q_name = nullptr;
 
-    std::string string() {
+    std::string string() const {
         return std::format("check_only={}, cfg_file={}, max_files={}, q_name={}",
             check_only, cfg_file, max_files, NULLABLE_CSTR(q_name));
     }
 };
 
 bool set_app_args(int argc, char** argv, app_args_t* app_args);
-int for_each_queue_file(const app_args_t* app_args, const libconfig::Config* app_cfg, sigset_t* sigset);
+int for_each_queue_file(const app_args_t* app_args, const libconfig::Config* app_cfg, sigset_t* sigset, const int max_process);
 
 struct [[nodiscard]] critical_section {
     pthread_mutex_t* mutex;
@@ -49,50 +51,54 @@ struct [[nodiscard]] critical_section {
 struct work_queue_item_t {
     std::filesystem::path entry_path;
     fbjqutil::request_file_header_t rfhdr;
-    std::filesystem::path archive_dir;
-    std::filesystem::path dead_dir;
 };
 
 struct worker_param_t
 {
     int id = -1;
-    sem_t* worker_slots = nullptr;
+    int sem_fd = -1;
     pthread_mutex_t* mutex = nullptr;
     pthread_cond_t* cond = nullptr;
     std::deque<std::unique_ptr<work_queue_item_t>>* work_queue = nullptr;
     bool* term_requested = nullptr;
+    bool* term_immediate = nullptr;
+    std::filesystem::path spool_dir;
 };
 
 class JobDispatcher
 {
 private:
-    const std::filesystem::path archive_dir;
-    const std::filesystem::path dead_dir;
+    const std::filesystem::path spool_dir;
 
-    sem_t* worker_slots = nullptr;
+    int sig_fd = -1;
+    int sem_fd = -1;
+    int epoll_fd = -1;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-    std::vector<std::unique_ptr<worker_param_t>> worker_params;
+    std::vector<worker_param_t> worker_params;
     std::vector<pthread_t> workers;
     std::deque<std::unique_ptr<work_queue_item_t>> work_queue;
     bool term_requested = false;
+    bool term_immediate = false;
+
+    bool dispatch_internal(const std::filesystem::path& entry_path,
+        const fbjqutil::request_file_header_t* rfhdr);
+
 
 public:
-    JobDispatcher(const std::filesystem::path& arg_archive_dir, const std::filesystem::path& arg_dead_dir)
-        : archive_dir{ arg_archive_dir }, dead_dir{ arg_dead_dir } { }
+    JobDispatcher(const std::filesystem::path& arg_spool_dir)
+        : spool_dir{ arg_spool_dir } { }
 
     ~JobDispatcher();
 
     JobDispatcher(const JobDispatcher&) = delete;
     JobDispatcher& operator=(const JobDispatcher&) = delete;
 
-    static std::unique_ptr<JobDispatcher> make(
-        const std::filesystem::path& archive_dir, const std::filesystem::path& dead_dir,
-        int max_process);
+    static std::unique_ptr<JobDispatcher> make(sigset_t* sigset,
+        const std::filesystem::path& spool_dir,  int max_process);
 
-    bool dispatch(sigset_t* sigset,
-        const std::filesystem::path& entry_path,
+    fbjqutil::OnRegularFileResult dispatch(const std::filesystem::path& entry_path,
         const fbjqutil::request_file_header_t* rfhdr);
 };
 

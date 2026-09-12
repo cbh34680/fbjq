@@ -39,7 +39,7 @@ bool get_path_from_fd(int fd, char* buf, size_t buf_siz)
     char proc_path[PATH_MAX];
     std::snprintf(proc_path, sizeof(proc_path), "/proc/self/fd/%d", fd);
 
-    const auto len = ::readlink(proc_path, buf, buf_siz - 1);
+    const auto len = TEMP_FAILURE_RETRY(::readlink(proc_path, buf, buf_siz - 1));
     if (len == -1) {
         LOG_ERROR("{}: readlink", proc_path);
         return false;

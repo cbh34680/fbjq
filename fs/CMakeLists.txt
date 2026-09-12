@@ -1,11 +1,11 @@
 # fs/CMakeLists.txt
 add_executable(fbjq-fs main.cpp args.cpp operation.cpp helper.cpp)
 
-target_compile_definitions(fbjq-fs PRIVATE
-    $<$<CONFIG:Debug>:DEBUG>
-    _FILE_OFFSET_BITS=64
-    _GNU_SOURCE
-)
+#target_compile_definitions(fbjq-fs PRIVATE
+#    $<$<CONFIG:Debug>:DEBUG>
+#    _FILE_OFFSET_BITS=64
+#    _GNU_SOURCE
+#)
 
 # fuse3
 pkg_check_modules(FUSE3 REQUIRED IMPORTED_TARGET fuse3)

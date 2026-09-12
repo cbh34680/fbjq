@@ -98,7 +98,7 @@ std::unique_ptr<libconfig::Config> load_config(const char* cfg_file)
 
     struct stat st;
 
-    if (::stat(cfg_file, &st) == -1) {
+    if (TEMP_FAILURE_RETRY(::stat(cfg_file, &st)) == -1) {
         LOG_ERROR("{}: stat", cfg_file);
         return nullptr;
     }
