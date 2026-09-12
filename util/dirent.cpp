@@ -67,7 +67,7 @@ int for_each_file(const libconfig::Config* app_cfg, const std::filesystem::path&
                     throw std::runtime_error(std::format("{}: invalid magic", entry_path));
                 }
 
-                if (::strcmp(rfhdr.version, cfg_version) != 0) {
+                if (::strncmp(rfhdr.version, cfg_version, sizeof(rfhdr.version)) != 0) {
                     throw std::runtime_error(std::format("{}: unknown version", entry_path));
                 }
 

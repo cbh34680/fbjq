@@ -171,17 +171,10 @@ struct std::formatter<std::filesystem::path> {
     }
 };
 
-#define LOG_ERROR(...) fbjqutil::log_impl("ERR", std::cerr, std::source_location::current(), __VA_ARGS__)
-
-#define LOG_WARN(...) fbjqutil::log_impl("WRN", std::cerr, std::source_location::current(), __VA_ARGS__)
-
-#define LOG_INFO(...) fbjqutil::log_impl("INF", std::cout, std::source_location::current(), __VA_ARGS__)
-
-#if defined(DEBUG)
-#define LOG_DEBUG(...) fbjqutil::log_impl("DBG", std::cerr, std::source_location::current(), __VA_ARGS__)
-#else
-#define LOG_DEBUG(...) do { } while (false)
-#endif
+#define LOG_ERROR(...) fbjqutil::log_impl("<3>", std::cerr, std::source_location::current(), __VA_ARGS__)
+#define LOG_WARN(...) fbjqutil::log_impl("<4>", std::cerr, std::source_location::current(), __VA_ARGS__)
+#define LOG_INFO(...) fbjqutil::log_impl("<6>", std::cout, std::source_location::current(), __VA_ARGS__)
+#define LOG_DEBUG(...) fbjqutil::log_impl("<7>", std::cerr, std::source_location::current(), __VA_ARGS__)
 
 #define NULLABLE_CSTR(x) (x) ? (x) : "(null)"
 

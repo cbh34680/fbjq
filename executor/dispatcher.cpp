@@ -6,82 +6,76 @@ bool JobDispatcher::dispatch_internal(const std::filesystem::path& entry_path,
 {
     ENTER_FUNCTION();
 
-    struct epoll_event events[16];
-    bool cont = true;
+    struct epoll_event events[2];
 
-    do
-    {
-        const auto nfds = TEMP_FAILURE_RETRY(::epoll_wait(epoll_fd, events, std::size(events), -1));
-        if (nfds == -1) {
-            throw std::runtime_error("epoll_wait");
+    const auto nfds = TEMP_FAILURE_RETRY(::epoll_wait(epoll_fd, events, std::size(events), -1));
+    if (nfds == -1) {
+        throw std::runtime_error("epoll_wait");
+    }
+
+    for (int i=0; i<static_cast<int>(nfds); i++) {
+        const auto* event = &events[i];
+
+        if (event->events & (EPOLLERR | EPOLLHUP)) {
+            throw std::runtime_error("!EPOLLERR/EPOLLHUP");
         }
 
-        for (int i=0; i<static_cast<int>(nfds); i++) {
-            const auto* event = &events[i];
+        if (! (event->events & EPOLLIN)) {
+            throw std::runtime_error("!EPOLLIN");
+        }
 
-            if (event->events & (EPOLLERR | EPOLLHUP)) {
-                throw std::runtime_error("!EPOLLERR/EPOLLHUP");
-            }
+        if (event->data.fd == sig_fd) {
+            LOG_DEBUG("catch signal");
 
-            if (! (event->events & EPOLLIN)) {
-                throw std::runtime_error("!EPOLLIN");
-            }
+            struct signalfd_siginfo fdsi;
+            const auto s = TEMP_FAILURE_RETRY(::read(sig_fd, &fdsi, sizeof(fdsi)));
 
-            if (event->data.fd == sem_fd) {
-                LOG_DEBUG("found free-worker");
-
-                uint64_t count;
-                const auto s = TEMP_FAILURE_RETRY(::read(sem_fd, &count, sizeof(count)));
-
-                if (s > 0) {
-                    critical_section cs_{ &mutex };
-
-                    work_queue.emplace_back(std::make_unique<work_queue_item_t>(work_queue_item_t{
-                        .entry_path = entry_path,
-                        .rfhdr = *rfhdr,
-                    }));
-
-                    LOG_DEBUG("notify entry_path={}", entry_path);
-                    ::pthread_cond_signal(&cond);
-
-                    cont = false;
-
-                } else if (s == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-                    // continue
-                    LOG_DEBUG("retry");
+            if (s == sizeof(fdsi)) {
+                if (fdsi.ssi_signo == SIGTERM || fdsi.ssi_signo == SIGINT) {
+                    LOG_INFO("Received signo={}, graceful-terminate", fdsi.ssi_signo);
+                    return false;
 
                 } else {
-                    throw std::runtime_error(std::format("read s={}", s));
+                    throw std::runtime_error(std::format("Received signo={}, immediate-terminate", fdsi.ssi_signo));
                 }
 
-            } else if (event->data.fd == sig_fd) {
-                LOG_DEBUG("catch signal");
-
-                struct signalfd_siginfo fdsi;
-                const auto s = TEMP_FAILURE_RETRY(::read(sig_fd, &fdsi, sizeof(fdsi)));
-
-                if (s == sizeof(fdsi)) {
-                    if (fdsi.ssi_signo == SIGTERM || fdsi.ssi_signo == SIGINT) {
-                        LOG_INFO("Received signo={}", fdsi.ssi_signo);
-                        return false;
-
-                    } else {
-                        throw std::runtime_error(std::format("Received signo={}", fdsi.ssi_signo));
-                    }
-
-                } else if (s == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-                    // continue
-                    LOG_DEBUG("retry");
-
-                } else {
-                    throw std::runtime_error(std::format("read s={}", s));
-                }
+            } else if (s == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                // continue
+                LOG_DEBUG("retry");
 
             } else {
-                throw std::runtime_error(std::format("fd={}", event->data.fd));
+                throw std::runtime_error(std::format("read s={}", s));
             }
+
+        } else if (event->data.fd == sem_fd) {
+            LOG_DEBUG("found free-worker");
+
+            uint64_t count;
+            const auto s = TEMP_FAILURE_RETRY(::read(sem_fd, &count, sizeof(count)));
+
+            if (s == sizeof(count)) {
+                critical_section cs_{ &mutex };
+
+                work_queue.emplace_back(std::make_unique<work_queue_item_t>(work_queue_item_t{
+                    .entry_path = entry_path,
+                    .rfhdr = *rfhdr,
+                }));
+
+                LOG_DEBUG("notify entry_path={}", entry_path);
+                ::pthread_cond_signal(&cond);
+
+            } else if (s == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                // continue
+                LOG_DEBUG("retry");
+
+            } else {
+                throw std::runtime_error(std::format("read s={}", s));
+            }
+
+        } else {
+            throw std::runtime_error(std::format("fd={}", event->data.fd));
         }
-    } while (cont);
+    }
 
     LOG_DEBUG("dispatch done");
 
@@ -91,11 +85,12 @@ bool JobDispatcher::dispatch_internal(const std::filesystem::path& entry_path,
 fbjqutil::OnRegularFileResult JobDispatcher::dispatch(const std::filesystem::path& entry_path,
     const fbjqutil::request_file_header_t* rfhdr)
 {
+    ENTER_FUNCTION();
+
     try {
         return dispatch_internal(entry_path, rfhdr)
             ? fbjqutil::OnRegularFileResult::Continue
             : fbjqutil::OnRegularFileResult::Break;
-
 
     } catch (const std::exception& ex) {
         LOG_ERROR("catch exception what={}", ex.what());
